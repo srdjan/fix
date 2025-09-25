@@ -7,11 +7,15 @@ export type FsHost = {
 };
 
 export function tempDirOp(host: FsHost) {
-  return async function acquire(prefix = "tmp-"): Promise<Releasable<{ path: string }>> {
+  return async function acquire(
+    prefix = "tmp-",
+  ): Promise<Releasable<{ path: string }>> {
     const path = await host.mkdtemp(prefix);
     return {
       value: { path },
-      release: async () => { await host.rm(path, { recursive: true }); }
+      release: async () => {
+        await host.rm(path, { recursive: true });
+      },
     };
   };
 }

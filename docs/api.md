@@ -1,33 +1,122 @@
 # API
 
+Primary types live in `@macrofx/core` (`packages/core`). The snippets below
+mirror the source to keep signatures accurate.
+
 ## `execute(step, config)`
 
-Runs a single step with the provided base context, macros, and host env.
+```ts
+import type { EngineConfig, Meta, Step } from "@macrofx/core";
+
+async function execute<M extends Meta, Base, Out, Scope>(
+  step: Step<M, Base, Out, Scope>,
+  cfg: EngineConfig<Base, M>,
+): Promise<Out>;
+```
+
+- Resolves macros that match `step.meta`, merges their capability results
+  (ports + leases), weaves policies, and runs the step.
+- Macros can short-circuit the run by setting `ctx.__macrofxSkip = true` and
+  `ctx.__macrofxValue = value` during their `before` hook (the built-in
+  idempotency macro uses this).
+- The context passed into `run` is structurally typed as
+  `Base & CapsOf<M, Scope> & { meta: M }`.
+
+### `EngineConfig`
+
+```ts
+export type EngineConfig<Base, M extends Meta> = {
+  base: Base;
+  macros: Macro<M, object>[];
+  env?: unknown;
+};
+```
+
+- `base` – initial data available to your step (request ids, user ids, feature
+  flags, etc.).
+- `macros` – usually `stdMacros`, but you can supply any macro list; order
+  matters when overlapping keys.
+- `env` – host-specific factories consumed by macros (`makeHttp`, `makeDb`,
+  `fs`, …).
+
+## `Step`
+
+```ts
+export type ExecutionCtx<M extends Meta, Base, Scope> =
+  & Base
+  & CapsOf<M, Scope>
+  & { meta: M };
+
+export type Step<M extends Meta, Base, Out, Scope> = {
+  name: string;
+  meta: M;
+  run: (ctx: ExecutionCtx<M, Base, Scope>) => Promise<Out> | Out;
+};
+```
+
+- `meta` drives both type inference (what appears on `ctx`) and runtime
+  selection of macros/policies.
+- `Scope` is an opaque type brand you can use to prevent leases from escaping a
+  given pipeline (commonly `symbol`).
+
+## Capabilities inference
+
+```ts
+export type CapsOf<M extends Meta, Scope> =
+  & (M["http"] extends object ? { http: HttpPort } : {})
+  & (M["kv"] extends object ? { kv: KvPort } : {})
+  & (M["db"] extends object ? { db?: DbPort } : {})
+  & (M["queue"] extends object ? { queue: QueuePort } : {})
+  & (M["time"] extends object ? { time: TimePort } : {})
+  & (M["crypto"] extends object ? { crypto: CryptoPort } : {})
+  & (M["log"] extends object ? { log: LogPort } : {})
+  & (M["db"] extends object ? { lease: Pick<LeasePort<Scope>, "db" | "tx"> }
+    : {})
+  & (M["fs"] extends object ? { lease: Pick<LeasePort<Scope>, "tempDir"> } : {})
+  & (M["lock"] extends object ? { lease: Pick<LeasePort<Scope>, "lock"> } : {})
+  & (M["socket"] extends object ? { lease: Pick<LeasePort<Scope>, "socket"> }
+    : {})
+  & { bracket: Bracket };
+```
+
+Every matching macro contributes to the eventual `lease` object. The executor
+deep-merges these contributions so `lease.db`, `lease.tempDir`, and `lease.lock`
+can coexist in one step.
 
 ## `Macro`
 
 ```ts
-type Macro<M, Caps> = {
+export type Macro<M, Caps> = {
   key: string;
-  match(m: M): boolean;
-  resolve(m: M, env: unknown): Promise<Caps>;
-  before?(ctx: any): Promise<void>;
-  onError?(e: unknown, ctx: any): Promise<never | unknown>;
-  after?<T>(value: T, ctx: any): Promise<T>;
+  match: (meta: M) => boolean;
+  resolve: (meta: M, env: unknown) => Promise<Caps>;
+  before?: (ctx: unknown) => Promise<void>;
+  onError?: (error: unknown, ctx: unknown) => Promise<unknown>;
+  after?: <T>(value: T, ctx: unknown) => Promise<T>;
 };
 ```
 
-- **resolve** returns partial caps (ports / lease openers).
-- **before/after** optionally add guards or telemetry.
+- `match` should be pure – it is evaluated multiple times per run.
+- `resolve` is allowed to return partial capability objects; the executor merges
+  them.
+- `before` / `after` / `onError` run only when `match(meta)` is truthy.
+- Use `before` to gate execution (e.g. cache hits, rate limits), `after` to
+  persist side effects, and `onError` for focused recovery.
 
-## `Bracket`
+## `bracket`
 
 ```ts
-async function bracket<T, R>(
+export async function bracket<T, R>(
   acquire: () => Promise<Releasable<T>>,
-  use: (t: T) => Promise<R>,
-  finalizer?: (t: T) => Promise<void>
-): Promise<R>
+  use: (value: T) => Promise<R>,
+  finalizer?: (value: T) => Promise<void>,
+): Promise<R>;
 ```
 
-Guarantees cleanup even on error.
+Wrap resource lifetimes in `bracket` to guarantee release even if `use` throws.
+Supply an optional `finalizer` when a post-use cleanup (flushing metrics,
+deleting temp files) should run before the lease is released.
+
+> All code examples in this document mirror the source code in `packages/core`
+> as of September 25, 2025. Run `deno task fmt` after editing to keep signatures
+> in sync.

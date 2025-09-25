@@ -8,7 +8,10 @@ export function withJitter(delay: number): number {
 }
 
 // Generic method wrapper utility
-export function wrapMethods<T extends object>(obj: T, wrap: (fn: Function, key: string) => Function): T {
+export function wrapMethods<T extends object>(
+  obj: T,
+  wrap: (fn: Function, key: string) => Function,
+): T {
   const out: any = {};
   for (const key of Object.keys(obj)) {
     const val: any = (obj as any)[key];

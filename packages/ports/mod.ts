@@ -49,18 +49,24 @@ export type Releasable<T> = { value: T; release: () => Promise<void> };
 
 export type LockHandle = { key: string };
 
-export type Socket = { write: (buf: Uint8Array) => Promise<void>; close: () => Promise<void> };
+export type Socket = {
+  write: (buf: Uint8Array) => Promise<void>;
+  close: () => Promise<void>;
+};
 
 export type LeasePort<Scope> = {
-  db(role: "ro" | "rw"): Promise<Lease<DbPort, Scope>>;
+  db(role: "ro" | "rw"): Promise<Releasable<Lease<DbPort, Scope>>>;
   tx<T>(fn: (db: Lease<DbPort, Scope>) => Promise<T>): Promise<T>;
-  tempDir(prefix?: string): Promise<Lease<{ path: string }, Scope>>;
-  lock(key: string, mode?: "exclusive" | "shared"): Promise<Lease<LockHandle, Scope>>;
-  socket(host: string, port: number): Promise<Lease<Socket, Scope>>;
+  tempDir(prefix?: string): Promise<Releasable<Lease<{ path: string }, Scope>>>;
+  lock(
+    key: string,
+    mode?: "exclusive" | "shared",
+  ): Promise<Releasable<Lease<LockHandle, Scope>>>;
+  socket(host: string, port: number): Promise<Releasable<Lease<Socket, Scope>>>;
 };
 
 export type Bracket = <T, R>(
   acquire: () => Promise<Releasable<T>>,
   use: (t: T) => Promise<R>,
-  finalizer?: (t: T) => Promise<void>
+  finalizer?: (t: T) => Promise<void>,
 ) => Promise<R>;

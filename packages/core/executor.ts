@@ -4,7 +4,7 @@ import type { EngineConfig, Meta, Step } from "./types.ts";
 
 export async function execute<M extends Meta, Base, Out, Scope>(
   step: Step<M, Base, Out, Scope>,
-  cfg: EngineConfig<Base, M>
+  cfg: EngineConfig<Base, M>,
 ): Promise<Out> {
   const { base, macros, env } = cfg;
   // 1) validate (lightweight here)
@@ -15,17 +15,27 @@ export async function execute<M extends Meta, Base, Out, Scope>(
   for (const m of macros) {
     if (!m.match(step.meta as any)) continue;
     const partial = await m.resolve(step.meta as any, env);
-    Object.assign(caps, partial);
+    if (!partial) continue;
+    const { lease: leasePartial, ...rest } = partial as any;
+    if (rest && Object.keys(rest).length) Object.assign(caps, rest);
+    if (leasePartial) {
+      caps.lease = { ...(caps.lease ?? {}), ...leasePartial };
+    }
   }
 
   // 3) weave policies (retry/timeout/log etc)
-  const ctx = { ...base, ...weave(step.meta as any, caps) };
+  const ctx: any = { ...base, ...weave(step.meta as any, caps) };
+  ctx.meta = step.meta;
 
   // 4) before guards
   for (const m of macros) {
     if (m.match(step.meta as any) && m.before) {
       await m.before(ctx);
     }
+  }
+
+  if ((ctx as any).__macrofxSkip) {
+    return (ctx as any).__macrofxValue as Out;
   }
 
   // 5) run

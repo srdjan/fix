@@ -1,17 +1,27 @@
-import type { HttpPort, KvPort, DbPort, QueuePort, TimePort, CryptoPort, LogPort, LeasePort, Bracket } from "../ports/mod.ts";
+import type {
+  Bracket,
+  CryptoPort,
+  DbPort,
+  HttpPort,
+  KvPort,
+  LeasePort,
+  LogPort,
+  QueuePort,
+  TimePort,
+} from "../ports/mod.ts";
 
 export type Meta = {
   // effect capabilities
   http?: { baseUrl?: string; auth?: "bearer" | "none" };
-  kv?:   { namespace: string };
-  db?:   { role: "ro" | "rw"; tx?: "required" | "new" | "none" };
-  queue?:{ name: string };
+  kv?: { namespace: string };
+  db?: { role: "ro" | "rw"; tx?: "required" | "new" | "none" };
+  queue?: { name: string };
   time?: {};
   crypto?: { uuid?: true; hash?: "sha256" | "none" };
   log?: { level: "debug" | "info" | "warn" | "error" };
 
   // resources
-  fs?:   { tempDir?: true; workDirPrefix?: string };
+  fs?: { tempDir?: true; workDirPrefix?: string };
   lock?: { key?: string; mode?: "exclusive" | "shared"; ttlMs?: number };
   socket?: { host?: string; port?: number };
 
@@ -25,24 +35,31 @@ export type Meta = {
 
 // Build the capabilities object based on meta presence.
 export type CapsOf<M extends Meta, Scope> =
-  (M["http"]   extends object ? { http: HttpPort } : {}) &
-  (M["kv"]     extends object ? { kv: KvPort }     : {}) &
-  (M["db"]     extends object ? { db?: DbPort }    : {}) & // db as effect port (optional) when not using tx
-  (M["queue"]  extends object ? { queue: QueuePort } : {}) &
-  (M["time"]   extends object ? { time: TimePort } : {}) &
-  (M["crypto"] extends object ? { crypto: CryptoPort } : {}) &
-  (M["log"]    extends object ? { log: LogPort } : {}) &
-  // resource lease openers, gated by meta
-  (M["db"]     extends object ? { lease: Pick<LeasePort<Scope>, "db" | "tx"> } : {}) &
-  (M["fs"]     extends object ? { lease: Pick<LeasePort<Scope>, "tempDir"> } : {}) &
-  (M["lock"]   extends object ? { lease: Pick<LeasePort<Scope>, "lock"> } : {}) &
-  (M["socket"] extends object ? { lease: Pick<LeasePort<Scope>, "socket"> } : {}) &
-  { bracket: Bracket };
+  & (M["http"] extends object ? { http: HttpPort } : {})
+  & (M["kv"] extends object ? { kv: KvPort } : {})
+  & (M["db"] extends object ? { db?: DbPort } : {})
+  & // db as effect port (optional) when not using tx
+  (M["queue"] extends object ? { queue: QueuePort } : {})
+  & (M["time"] extends object ? { time: TimePort } : {})
+  & (M["crypto"] extends object ? { crypto: CryptoPort } : {})
+  & (M["log"] extends object ? { log: LogPort } : {})
+  & // resource lease openers, gated by meta
+  (M["db"] extends object ? { lease: Pick<LeasePort<Scope>, "db" | "tx"> } : {})
+  & (M["fs"] extends object ? { lease: Pick<LeasePort<Scope>, "tempDir"> } : {})
+  & (M["lock"] extends object ? { lease: Pick<LeasePort<Scope>, "lock"> } : {})
+  & (M["socket"] extends object ? { lease: Pick<LeasePort<Scope>, "socket"> }
+    : {})
+  & { bracket: Bracket };
 
-export type Step<M, Base, Out, Scope> = {
+export type ExecutionCtx<M extends Meta, Base, Scope> =
+  & Base
+  & CapsOf<M, Scope>
+  & { meta: M };
+
+export type Step<M extends Meta, Base, Out, Scope> = {
   name: string;
   meta: M;
-  run: (ctx: Base & any) => Promise<Out> | Out;
+  run: (ctx: ExecutionCtx<M, Base, Scope>) => Promise<Out> | Out;
 };
 
 export type Macro<M, Caps> = {
