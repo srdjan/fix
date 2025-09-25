@@ -1,0 +1,14 @@
+{
+  "tasks": {
+    "fmt": "deno fmt --ignore=**/node_modules",
+    "lint": "deno lint",
+    "typecheck": "deno check examples/deno/api.ts",
+    "demo": "deno run -A examples/deno/api.ts",
+    "test": "deno test -A"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any"]
+    }
+  }
+}
