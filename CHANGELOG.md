@@ -16,7 +16,7 @@ and this project adheres to
   timeout-safe cleanup.
 - Fluent meta builder that exposes helper methods directly on the meta object
   while keeping `.build()` optional.
-- Standard engine helper exports and a default in-memory env in `@macrofx/std`.
+- Standard engine helper exports and a default in-memory env in `@fix/std`.
 - Comprehensive examples demonstrating pipelines, branching, result-based error
   handling, and meta composition using the new engine flow.
 - Dedicated regression tests covering lease timeout cleanup, logging, and jitter
@@ -35,4 +35,4 @@ and this project adheres to
 
 - Implicit reliance on `ctx.__macros` / `ctx.__env`; helpers now operate through
   the attached engine instance.
-- Node-specific `@macrofx/host-node` adapter (superseded by the std env).
+- Node-specific `@fix/host-node` adapter (superseded by the std env).

@@ -10,30 +10,30 @@ import type {
   TimePort,
 } from "../ports/mod.ts";
 
-const MACROFX_SKIP_SYMBOL = Symbol.for("macrofx.skip");
-const MACROFX_VALUE_SYMBOL = Symbol.for("macrofx.value");
+const FIX_SKIP_SYMBOL = Symbol.for("fix.skip");
+const FIX_VALUE_SYMBOL = Symbol.for("fix.value");
 
-export const MACROFX_SKIP = MACROFX_SKIP_SYMBOL;
-export const MACROFX_VALUE = MACROFX_VALUE_SYMBOL;
+export const FIX_SKIP = FIX_SKIP_SYMBOL;
+export const FIX_VALUE = FIX_VALUE_SYMBOL;
 
 export type MacroResultCarrier = {
-  [MACROFX_SKIP_SYMBOL]?: true;
-  [MACROFX_VALUE_SYMBOL]?: unknown;
+  [FIX_SKIP_SYMBOL]?: true;
+  [FIX_VALUE_SYMBOL]?: unknown;
 };
 
 export function setMacroResult<T>(ctx: MacroResultCarrier, value: T): void {
-  ctx[MACROFX_SKIP_SYMBOL] = true;
-  ctx[MACROFX_VALUE_SYMBOL] = value;
+  ctx[FIX_SKIP_SYMBOL] = true;
+  ctx[FIX_VALUE_SYMBOL] = value;
 }
 
 export function hasMacroResult(
   ctx: MacroResultCarrier,
-): ctx is MacroResultCarrier & { [MACROFX_SKIP_SYMBOL]: true } {
-  return Boolean(ctx[MACROFX_SKIP_SYMBOL]);
+): ctx is MacroResultCarrier & { [FIX_SKIP_SYMBOL]: true } {
+  return Boolean(ctx[FIX_SKIP_SYMBOL]);
 }
 
 export function getMacroResult<T>(ctx: MacroResultCarrier): T | undefined {
-  return ctx[MACROFX_VALUE_SYMBOL] as T | undefined;
+  return ctx[FIX_VALUE_SYMBOL] as T | undefined;
 }
 
 export type Meta = {

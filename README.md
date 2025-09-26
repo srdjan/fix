@@ -1,4 +1,4 @@
-# macrofx-unified
+# fix
 
 **A unified, type-safe, metadata-driven pipeline for capabilities (effects)
 _and_ resources (leases) in modern TypeScript.**\
@@ -11,7 +11,7 @@ validate → resolve → before → run → onError → after
 
 This monorepo combines three ideas under one engine:
 
-- **macrofx (capability injection):** declare what you need in `meta`; get typed
+- **fix (capability injection):** declare what you need in `meta`; get typed
   ports in `ctx`.
 - **effectfx (side-effects):** HTTP, KV, DB, Queue, Time, Crypto, Log as
   **Ports**, host-agnostic.
@@ -40,7 +40,7 @@ GET /users/123 → { id: "123", name: "Ada" }
 ## Monorepo layout
 
 ```
-macrofx-unified/
+fix/
   packages/
     core/           # executor, types, policy weaver
     ports/          # type-only port surfaces
@@ -61,7 +61,7 @@ macrofx-unified/
   all ports/openers.
 - **Host-agnostic**: extend the provided in-memory env (`packages/std/env.ts`)
   or supply your own factories for real hosts.
-- **Testable**: pass `@macrofx/testing` fakes into the executor; everything is
+- **Testable**: pass `@fix/testing` fakes into the executor; everything is
   functions.
 
 ## Key Features
@@ -71,7 +71,7 @@ macrofx-unified/
 Build meta declaratively with type-safe chaining:
 
 ```typescript
-import { meta } from "@macrofx/core";
+import { meta } from "@fix/core";
 
 const myMeta = meta()
   .withDb("ro")
@@ -87,7 +87,7 @@ const myMeta = meta()
 Compose steps into pipelines, parallel execution, and branches:
 
 ```typescript
-import { allSteps, branch, pipe, race } from "@macrofx/core";
+import { allSteps, branch, pipe, race } from "@fix/core";
 
 // Sequential pipeline
 const pipeline = pipe<Base>()(fetchUser, enrichProfile, cacheResult);
@@ -107,15 +107,8 @@ const tiered = branch<"free" | "pro" | "enterprise", Base>(plan)
 Type-safe error handling without exceptions:
 
 ```typescript
-import {
-  err,
-  map,
-  matchResult,
-  ok,
-  type Result,
-  withResult,
-} from "@macrofx/core";
-import { createStdEngine } from "@macrofx/std";
+import { err, map, matchResult, ok, type Result, withResult } from "@fix/core";
+import { createStdEngine } from "@fix/std";
 
 const safeStep = withResult<Base>()(riskyStep);
 const engine = createStdEngine<Base>();
@@ -149,7 +142,7 @@ async run(ctx) {
 ### 🛡️ Better Validation & Error Messages
 
 ```typescript
-import { assertValidStep, validateStep } from "@macrofx/core";
+import { assertValidStep, validateStep } from "@fix/core";
 
 // Helpful errors with suggestions
 // [UNKNOWN_CAPABILITY] Step declares 'redis' but no matching macro registered
@@ -163,7 +156,7 @@ import { assertValidStep, validateStep } from "@macrofx/core";
 - `examples/deno/api.ts` — HTTP-like example with cache + db + retry + timeout
 - `examples/advanced/multi-resource.ts` — Nested leases with finalisers
 - `examples/advanced/policy-combo.ts` — Retry + timeout + circuit breaker
-- `examples/testing/with-fakes.test.ts` — Using `@macrofx/testing` fakes
+- `examples/testing/with-fakes.test.ts` — Using `@fix/testing` fakes
 
 ### New Ergonomic Examples
 
@@ -199,8 +192,8 @@ import { assertValidStep, validateStep } from "@macrofx/core";
 ## Publishing strategy
 
 - Keep code here as a mono-source of truth.
-- Publish packages as: `@macrofx/core`, `@macrofx/std`, `@macrofx/ports`,
-  `@macrofx/resources`, `@macrofx/testing`.
+- Publish packages as: `@fix/core`, `@fix/std`, `@fix/ports`, `@fix/resources`,
+  `@fix/testing`.
 
 ## License
 

@@ -1,15 +1,15 @@
 # Testing Strategies
 
-`@macrofx/testing` provides lightweight fakes that help you exercise pipelines
+`@fix/testing` provides lightweight fakes that help you exercise pipelines
 without hitting real infrastructure. Combine them with bespoke env factories to
 keep tests deterministic.
 
 ## Logger capture
 
 ```ts
-import { createEngine, defineStep } from "@macrofx/core";
-import { stdMacros } from "@macrofx/std";
-import { fakeKv, fakeLogger } from "@macrofx/testing";
+import { createEngine, defineStep } from "@fix/core";
+import { stdMacros } from "@fix/std";
+import { fakeKv, fakeLogger } from "@fix/testing";
 
 const { logs, logger } = fakeLogger();
 const { port: kv } = fakeKv();

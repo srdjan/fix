@@ -1,9 +1,9 @@
 # Overview
 
-`macrofx-unified` orchestrates **capabilities** (pure effect ports) and
-**leases** (scoped resources) through a single engine-driven pipeline. You
-describe what a step needs in static `meta`, and the engine injects exactly
-those ports into `run(ctx)` at runtime while preserving compile-time safety.
+`fix` orchestrates **capabilities** (pure effect ports) and **leases** (scoped
+resources) through a single engine-driven pipeline. You describe what a step
+needs in static `meta`, and the engine injects exactly those ports into
+`run(ctx)` at runtime while preserving compile-time safety.
 
 ## Six-Phase Executor
 
@@ -62,7 +62,7 @@ timeout) and consistent for both ports and resource acquires.
   builder, and step composition utilities make complex workflows readable.
 - **Host agnostic** – macros depend on host-provided factories (`makeHttp`,
   `makeDb`, …); swap `env` objects to target Node, Deno, workers, or tests.
-- **Testable** – `@macrofx/testing` supplies fakes; the executor accepts any env
+- **Testable** – `@fix/testing` supplies fakes; the executor accepts any env
   implementing the same factories.
 
 ## New Ergonomic Features
@@ -78,7 +78,7 @@ return Results instead of throwing.
 Create and reuse engines instead of hand-wiring macros for every run:
 
 ```ts
-import { createStdEngine } from "@macrofx/std";
+import { createStdEngine } from "@fix/std";
 
 const engine = createStdEngine<RequestCtx>({ validate: true });
 const result = await engine.run(step, base);

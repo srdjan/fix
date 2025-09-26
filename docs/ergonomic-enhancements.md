@@ -1,6 +1,6 @@
 # Ergonomic Enhancements
 
-This document outlines the ergonomic improvements added to macrofx-unified.
+This document outlines the ergonomic improvements added to fix.
 
 ## Summary of Improvements
 

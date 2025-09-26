@@ -27,8 +27,8 @@ export type ContextHelpers<M extends Meta, Base, Scope> = {
   ): Promise<R>;
 };
 
-const MEMO_SYMBOL = Symbol.for("macrofx.memo");
-const SPAN_SYMBOL = Symbol.for("macrofx.spans");
+const MEMO_SYMBOL = Symbol.for("fix.memo");
+const SPAN_SYMBOL = Symbol.for("fix.spans");
 
 type MemoStore = Map<string, any>;
 type SpanStore = Array<
@@ -147,7 +147,7 @@ export const memoize = async <R>(
   return result;
 };
 
-const ENGINE_SYMBOL = Symbol.for("macrofx.engine");
+const ENGINE_SYMBOL = Symbol.for("fix.engine");
 
 export const attachContextHelpers = <
   M extends Meta,

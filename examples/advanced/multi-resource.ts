@@ -38,7 +38,7 @@ const step = defineStep<Base, symbol>()({
         log.info("lock.acquired", { tenantId });
 
         return await bracket(
-          () => lease.tempDir(`macrofx-${tenantId}-`),
+          () => lease.tempDir(`fix-${tenantId}-`),
           async ({ path }: { path: string }) => {
             const artifacts: string[] = [];
             artifacts.push(path);

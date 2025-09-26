@@ -1,12 +1,12 @@
 # API
 
-Primary types live in `@macrofx/core` (`packages/core`). The snippets below
-mirror the source to keep signatures accurate.
+Primary types live in `@fix/core` (`packages/core`). The snippets below mirror
+the source to keep signatures accurate.
 
 ## `createEngine(options)`
 
 ```ts
-import { createEngine, type Meta, type Step } from "@macrofx/core";
+import { createEngine, type Meta, type Step } from "@fix/core";
 
 const engine = createEngine<Base>({
   macros: Macro<M, object>[],
@@ -42,8 +42,8 @@ export type Engine<Base, M extends Meta = Meta> = {
 - `config` exposes the bound macros/env in case you need to inspect or extend
   them.
 - Use helpers like `createStdEngine` (see
-  [`@macrofx/std`](../packages/std/engine.ts)) for batteries-included engines
-  backed by the default in-memory env.
+  [`@fix/std`](../packages/std/engine.ts)) for batteries-included engines backed
+  by the default in-memory env.
 
 ## `execute(step, config)`
 
@@ -173,7 +173,7 @@ export type Macro<M, Caps> = {
 ### Macro helpers
 
 ```ts
-import { getMacroResult, hasMacroResult, setMacroResult } from "@macrofx/core";
+import { getMacroResult, hasMacroResult, setMacroResult } from "@fix/core";
 ```
 
 - `setMacroResult(ctx, value)` – short-circuits the executor before `run` when
@@ -181,8 +181,8 @@ import { getMacroResult, hasMacroResult, setMacroResult } from "@macrofx/core";
   `after/onError`.
 - `hasMacroResult(ctx)` / `getMacroResult(ctx)` – inspect whether a prior macro
   already supplied a value.
-- These helpers replace the old `ctx.__macrofxSkip`/`ctx.__macrofxValue` fields
-  with symbol-backed utilities.
+- These helpers replace the old `ctx.__fixSkip`/`ctx.__fixValue` fields with
+  symbol-backed utilities.
 
 ## `bracket`
 

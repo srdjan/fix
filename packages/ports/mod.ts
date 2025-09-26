@@ -44,8 +44,8 @@ export type LogPort = {
 
 // Resource leasing
 declare const ScopeBrand: unique symbol;
-const scopeBrandToken = Symbol.for("macrofx.scope");
-const defaultScopeToken = Symbol.for("macrofx.scope-token");
+const scopeBrandToken = Symbol.for("fix.scope");
+const defaultScopeToken = Symbol.for("fix.scope-token");
 
 export type Lease<T, Scope> = T & { readonly [ScopeBrand]: Scope };
 export type Releasable<T> = { value: T; release: () => Promise<void> };

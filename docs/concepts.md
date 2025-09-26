@@ -9,7 +9,7 @@
 - **Bracket**: a combinator that guarantees `acquire → use → release` even when
   `use` throws, plus an optional finaliser hook.
 - **Macro**: a small plugin that matches `meta`, resolves ports/leases, and can
-  run `before/after/onError` hooks. Built-ins live in `@macrofx/std`.
+  run `before/after/onError` hooks. Built-ins live in `@fix/std`.
 - **Weaver**: a transform that decorates ports and lease acquires with declared
   policies (circuit → log → retry → timeout) so behaviour is consistent.
 - **Policies**: reusable behaviours (`retry`, `timeout`, `circuit`,

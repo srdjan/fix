@@ -24,8 +24,8 @@ and reuse it for every run instead of passing macros/env inline to `execute`.
   breaker + idempotency working together, including explicit error-handling
   branches and macro short-circuiting. Run
   `deno run -A examples/advanced/policy-combo.ts`.
-- `examples/testing/with-fakes.test.ts` – Deno test using `@macrofx/testing`
-  fakes to assert logs without touching real hosts. Run
+- `examples/testing/with-fakes.test.ts` – Deno test using `@fix/testing` fakes
+  to assert logs without touching real hosts. Run
   `deno test -A examples/testing/with-fakes.test.ts`.
 
 ### Composition Examples (New)
