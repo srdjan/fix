@@ -4,7 +4,8 @@ All examples are TypeScript modules that can be executed with Deno 2+
 (`deno run -A …`). They adhere to the light functional style: no decorators, no
 classes – just data and functions. Each step is declared via
 `defineStep<Base>()` so `meta` literals stay inferred without manual type
-plumbing.
+plumbing. Most samples now construct an engine once (e.g. `createStdEngine()`)
+and reuse it for every run instead of passing macros/env inline to `execute`.
 
 ## Quick Start
 
@@ -41,8 +42,8 @@ plumbing.
 
 ### Result-Based Error Handling (New)
 
-- `examples/result-based/error-handling.ts` – Using `withResult()` to wrap
-  steps and handle errors with `matchResult()`. Run
+- `examples/result-based/error-handling.ts` – Using `withResult()` to wrap steps
+  and handle errors with `matchResult()`. Run
   `deno run -A examples/result-based/error-handling.ts`.
 - `examples/result-based/chaining.ts` – Result combinators (`map`, `flatMap`,
   `sequence`, `traverse`) for functional error handling. Run
@@ -50,8 +51,8 @@ plumbing.
 
 ### Meta Builder Examples (New)
 
-- `examples/builder/fluent-meta.ts` – Fluent meta builder API showing old vs
-  new style and complex compositions. Run
+- `examples/builder/fluent-meta.ts` – Fluent meta builder API showing old vs new
+  style and complex compositions. Run
   `deno run -A examples/builder/fluent-meta.ts`.
 - `examples/builder/meta-composition.ts` – Composing meta objects with
   `mergeMeta()` and `extendMeta()` for reusable patterns. Run

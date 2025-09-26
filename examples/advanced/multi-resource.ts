@@ -1,6 +1,5 @@
-import { defineStep, execute, type Meta } from "../../packages/core/mod.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { defineStep, type Meta } from "../../packages/core/mod.ts";
+import { createStdEngine } from "../../packages/std/mod.ts";
 
 /**
  * Demonstrates nested resource leases co-existing (lock + db + tempDir) and
@@ -75,10 +74,7 @@ const step = defineStep<Base, symbol>()({
 
 const base: Base = { tenantId: "123" };
 
-const result = await execute(step, {
-  base,
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const engine = createStdEngine<Base>();
+const result = await engine.run(step, base);
 
 console.log("multi-resource result", result);

@@ -1,7 +1,6 @@
-import { defineStep, execute } from "../../packages/core/mod.ts";
+import { defineStep } from "../../packages/core/mod.ts";
 import { meta } from "../../packages/core/meta-builder.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { createStdEngine } from "../../packages/std/mod.ts";
 
 type Base = { userId: string };
 
@@ -22,8 +21,7 @@ const newStyleMeta = meta()
   .withKv("users")
   .withRetry(3, 100)
   .withTimeout({ ms: 5000 })
-  .withLog("info")
-  .build();
+  .withLog("info");
 
 console.log("New style meta:", newStyleMeta);
 
@@ -49,11 +47,8 @@ const step = defineStep<Base>()({
 
 console.log("\n=== Executing Step with Builder Meta ===\n");
 
-const result = await execute(step, {
-  base: { userId: "builder-123" },
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const engine = createStdEngine<Base>();
+const result = await engine.run(step, { userId: "builder-123" });
 
 console.log("Result:", result);
 
@@ -69,7 +64,6 @@ const complexMeta = meta()
   .withRetry(5, 200, true)
   .withTimeout({ ms: 10000, acquireMs: 3000 })
   .withCircuit("api-calls", 60000)
-  .withLog("debug")
-  .build();
+  .withLog("debug");
 
 console.log("Complex meta:", JSON.stringify(complexMeta, null, 2));

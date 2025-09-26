@@ -1,5 +1,3 @@
-import { match, P } from "ts-pattern";
-
 export type Ok<T> = { readonly ok: true; readonly value: T };
 export type Err<E> = { readonly ok: false; readonly error: E };
 export type Result<T, E> = Ok<T> | Err<E>;
@@ -80,21 +78,15 @@ export const matchResult = <T, E, R>(
   result: Result<T, E>,
   onOk: (value: T) => R,
   onErr: (error: E) => R,
-): R =>
-  match(result)
-    .with({ ok: true }, (r) => onOk(r.value))
-    .with({ ok: false }, (r) => onErr(r.error))
-    .exhaustive();
+): R => (result.ok ? onOk(result.value) : onErr(result.error));
 
 export const matchResultAsync = async <T, E, R>(
   result: Result<T, E>,
   onOk: (value: T) => Promise<R> | R,
   onErr: (error: E) => Promise<R> | R,
-): Promise<R> =>
-  match(result)
-    .with({ ok: true }, async (r) => await onOk(r.value))
-    .with({ ok: false }, async (r) => await onErr(r.error))
-    .exhaustive();
+): Promise<
+  R
+> => (result.ok ? await onOk(result.value) : await onErr(result.error));
 
 export const trySync = <T, E = Error>(
   fn: () => T,
@@ -137,7 +129,8 @@ export const traverse = <T, U, E>(
 export const traverseAsync = async <T, U, E>(
   items: readonly T[],
   fn: (item: T) => Promise<Result<U, E>>,
-): Promise<Result<readonly U[], E>> => sequence(await Promise.all(items.map(fn)));
+): Promise<Result<readonly U[], E>> =>
+  sequence(await Promise.all(items.map(fn)));
 
 export const partition = <T, E>(
   results: readonly Result<T, E>[],

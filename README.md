@@ -46,7 +46,7 @@ macrofx-unified/
     ports/          # type-only port surfaces
     std/            # built-in macros & policies (http/kv/db + retry/timeout/log/idempotency)
     resources/      # bracket + Lease<T,Scope> + temp dir + simple pool
-    host-node/      # Node-compatible host bindings (fetch, crypto, fs, in-memory kv/db)
+    std/env.ts      # Default in-memory host bindings for demos and tests
     testing/        # fakes, chaos, leak detection helpers
   examples/
     deno/           # Deno.serve demo endpoint
@@ -59,8 +59,8 @@ macrofx-unified/
 - **One `meta`, one `CapsOf<M>`** for both effects and resources.
 - **One policy weaver** applies `retry/timeout/idempotency/log` uniformly across
   all ports/openers.
-- **Host-agnostic**: swap `host-node` (Node), `host-deno` (Deno, not required
-  for the demo), or write your own.
+- **Host-agnostic**: extend the provided in-memory env (`packages/std/env.ts`)
+  or supply your own factories for real hosts.
 - **Testable**: pass `@macrofx/testing` fakes into the executor; everything is
   functions.
 
@@ -78,8 +78,8 @@ const myMeta = meta()
   .withKv("users")
   .withRetry(3, 100, true)
   .withTimeout({ ms: 5000 })
-  .withLog("debug")
-  .build();
+  .withLog("debug");
+// Call .build() if you prefer to strip helper methods explicitly.
 ```
 
 ### 🔄 Step Composition
@@ -87,7 +87,7 @@ const myMeta = meta()
 Compose steps into pipelines, parallel execution, and branches:
 
 ```typescript
-import { pipe, allSteps, race, branch } from "@macrofx/core";
+import { allSteps, branch, pipe, race } from "@macrofx/core";
 
 // Sequential pipeline
 const pipeline = pipe<Base>()(fetchUser, enrichProfile, cacheResult);
@@ -107,15 +107,25 @@ const tiered = branch<"free" | "pro" | "enterprise", Base>(plan)
 Type-safe error handling without exceptions:
 
 ```typescript
-import { ok, err, map, matchResult, withResult, type Result } from "@macrofx/core";
+import {
+  err,
+  map,
+  matchResult,
+  ok,
+  type Result,
+  withResult,
+} from "@macrofx/core";
+import { createStdEngine } from "@macrofx/std";
 
 const safeStep = withResult<Base>()(riskyStep);
-const result = await execute(safeStep, config);
+const engine = createStdEngine<Base>();
+const base: Base = {/* ...request scoped data... */};
+const result = await engine.run(safeStep, base);
 
 matchResult(
   result,
   (data) => console.log("Success:", data),
-  (error) => console.error("Error:", error)
+  (error) => console.error("Error:", error),
 );
 ```
 
@@ -139,7 +149,7 @@ async run(ctx) {
 ### 🛡️ Better Validation & Error Messages
 
 ```typescript
-import { validateStep, assertValidStep } from "@macrofx/core";
+import { assertValidStep, validateStep } from "@macrofx/core";
 
 // Helpful errors with suggestions
 // [UNKNOWN_CAPABILITY] Step declares 'redis' but no matching macro registered
@@ -149,15 +159,18 @@ import { validateStep, assertValidStep } from "@macrofx/core";
 ## Examples
 
 ### Core Examples
+
 - `examples/deno/api.ts` — HTTP-like example with cache + db + retry + timeout
 - `examples/advanced/multi-resource.ts` — Nested leases with finalisers
 - `examples/advanced/policy-combo.ts` — Retry + timeout + circuit breaker
 - `examples/testing/with-fakes.test.ts` — Using `@macrofx/testing` fakes
 
 ### New Ergonomic Examples
+
 - `examples/composition/pipeline.ts` — Sequential pipeline with `pipe()`
 - `examples/composition/parallel.ts` — Parallel execution with `allSteps()`
-- `examples/composition/branching.ts` — Pattern-matched branching with ts-pattern
+- `examples/composition/branching.ts` — Pattern-matched branching with
+  ts-pattern
 - `examples/result-based/error-handling.ts` — Result type with steps
 - `examples/result-based/chaining.ts` — Result combinators
 - `examples/builder/fluent-meta.ts` — Meta builder usage
@@ -180,13 +193,14 @@ import { validateStep, assertValidStep } from "@macrofx/core";
 - [Testing Guide](./docs/testing.md) - Testing strategies and utilities
 - [Policies](./docs/policies.md) - Policy configuration and composition
 - [Examples Guide](./docs/examples.md) - Detailed example walkthroughs
-- [Ergonomic Enhancements](./docs/ergonomic-enhancements.md) - New features guide
+- [Ergonomic Enhancements](./docs/ergonomic-enhancements.md) - New features
+  guide
 
 ## Publishing strategy
 
 - Keep code here as a mono-source of truth.
 - Publish packages as: `@macrofx/core`, `@macrofx/std`, `@macrofx/ports`,
-  `@macrofx/resources`, `@macrofx/host-node`, `@macrofx/testing`.
+  `@macrofx/resources`, `@macrofx/testing`.
 
 ## License
 

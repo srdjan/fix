@@ -3,17 +3,60 @@
 Primary types live in `@macrofx/core` (`packages/core`). The snippets below
 mirror the source to keep signatures accurate.
 
+## `createEngine(options)`
+
+```ts
+import { createEngine, type Meta, type Step } from "@macrofx/core";
+
+const engine = createEngine<Base>({
+  macros: Macro<M, object>[],
+  env?: unknown,
+  validate?: boolean,
+});
+
+const result = await engine.run(step, base, { validate?: boolean });
+```
+
+- `createEngine` pre-binds your macro list and host environment once and returns
+  a reusable runner.
+- `engine.run(step, base)` performs the full six-phase lifecycle (validate →
+  resolve → weave → before → run → onError/after) with the stored macros.
+- Per-run validation can be toggled via the optional `validate` flag when
+  constructing the engine or invoking `run`.
+
+### `Engine`
+
+```ts
+export type EngineRunOptions = { validate?: boolean };
+
+export type Engine<Base, M extends Meta = Meta> = {
+  run: <SM extends M, Out, Scope>(
+    step: Step<SM, Base, Out, Scope>,
+    base: Base,
+    options?: EngineRunOptions,
+  ) => Promise<Out>;
+  config: { macros: Macro<M, object>[]; env?: unknown };
+};
+```
+
+- `config` exposes the bound macros/env in case you need to inspect or extend
+  them.
+- Use helpers like `createStdEngine` (see
+  [`@macrofx/std`](../packages/std/engine.ts)) for batteries-included engines
+  backed by the default in-memory env.
+
 ## `execute(step, config)`
 
 ```ts
-import type { EngineConfig, Meta, Step } from "@macrofx/core";
-
 async function execute<M extends Meta, Base, Out, Scope>(
   step: Step<M, Base, Out, Scope>,
   cfg: EngineConfig<Base, M>,
 ): Promise<Out>;
 ```
 
+- Convenience wrapper that instantiates a one-off engine and immediately calls
+  `run`. Useful for scripts and quick demos, but prefer `createEngine()` for
+  real applications.
 - Resolves macros that match `step.meta`, merges their capability results
   (ports + leases), weaves policies, and runs the step.
 - Macros can short-circuit the run by calling `setMacroResult(ctx, value)`
@@ -28,6 +71,7 @@ export type EngineConfig<Base, M extends Meta> = {
   base: Base;
   macros: Macro<M, object>[];
   env?: unknown;
+  validate?: boolean;
 };
 ```
 
@@ -39,6 +83,8 @@ export type EngineConfig<Base, M extends Meta> = {
   `fs`, …). If you expose `makeCircuit(name, policy)`, the weaver will persist
   circuit breaker state across step executions instead of keeping a per-run
   counter.
+- `validate` – opt out of step/meta validation when you know configuration is
+  sound and want maximum throughput.
 
 ## `Step`
 
@@ -244,13 +290,29 @@ async run(ctx) {
 ### Validation
 
 ```ts
-export type ValidationError = { code: string; message: string; suggestion?: string; details?: any };
-export type ValidationResult = { valid: true } | { valid: false; errors: readonly ValidationError[] };
+export type ValidationError = {
+  code: string;
+  message: string;
+  suggestion?: string;
+  details?: any;
+};
+export type ValidationResult = { valid: true } | {
+  valid: false;
+  errors: readonly ValidationError[];
+};
 
-export const validateStep: <M, Base, Out, Scope>(step: Step<M, Base, Out, Scope>, macros: Macro[]) => ValidationResult;
+export const validateStep: <M, Base, Out, Scope>(
+  step: Step<M, Base, Out, Scope>,
+  macros: Macro[],
+) => ValidationResult;
 export const validateMeta: (meta: Meta, macros: Macro[]) => ValidationResult;
-export const assertValidStep: <M, Base, Out, Scope>(step: Step<M, Base, Out, Scope>, macros: Macro[]) => void;
-export const formatValidationErrors: (errors: readonly ValidationError[]) => string;
+export const assertValidStep: <M, Base, Out, Scope>(
+  step: Step<M, Base, Out, Scope>,
+  macros: Macro[],
+) => void;
+export const formatValidationErrors: (
+  errors: readonly ValidationError[],
+) => string;
 ```
 
 ### Testing Utilities
@@ -276,7 +338,9 @@ export type PolicyAssertion = {
 // Port snapshotting
 export function snapshotPort<T>(port: T): {
   port: T;
-  interactions: Array<{ method: string; args: unknown[]; result?: unknown; error?: unknown }>;
+  interactions: Array<
+    { method: string; args: unknown[]; result?: unknown; error?: unknown }
+  >;
 };
 ```
 

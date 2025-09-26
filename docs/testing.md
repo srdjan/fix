@@ -7,7 +7,7 @@ keep tests deterministic.
 ## Logger capture
 
 ```ts
-import { defineStep, execute } from "@macrofx/core";
+import { createEngine, defineStep } from "@macrofx/core";
 import { stdMacros } from "@macrofx/std";
 import { fakeKv, fakeLogger } from "@macrofx/testing";
 
@@ -36,11 +36,12 @@ const cacheStep = defineStep<{ tenantId: string }>()({
   },
 });
 
-await execute(cacheStep, {
-  base: { tenantId: "green" },
+const engine = createEngine<{ tenantId: string }>({
   macros: stdMacros as any,
   env: testEnv,
 });
+
+await engine.run(cacheStep, { tenantId: "green" });
 ```
 
 - `fakeLogger()` captures every log call in the `logs` array for straightforward
@@ -59,7 +60,7 @@ await execute(cacheStep, {
 - Wrap any port with `withChaos(port, { failRate })` to simulate transient
   failures or latency spikes without touching production code.
 - Keep stores (`Map`, arrays) at the env level so data persists across multiple
-  `execute` calls in your test.
+  engine runs in your test.
 
 ## Assertion tips
 

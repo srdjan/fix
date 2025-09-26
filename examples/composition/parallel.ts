@@ -1,6 +1,5 @@
-import { allSteps, defineStep, execute } from "../../packages/core/mod.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { allSteps, defineStep } from "../../packages/core/mod.ts";
+import { createStdEngine } from "../../packages/std/mod.ts";
 import type { Meta } from "../../packages/core/types.ts";
 
 type Base = { userId: string };
@@ -49,11 +48,11 @@ const parallelFetch = allSteps<Base>()(
 
 console.log("\n=== Running Parallel Execution Example ===\n");
 
-const [userData, orders, recommendations] = await execute(parallelFetch, {
-  base: { userId: "456" },
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const engine = createStdEngine<Base>();
+const [userData, orders, recommendations] = await engine.run(
+  parallelFetch,
+  { userId: "456" },
+);
 
 console.log("User:", userData);
 console.log("Orders:", orders);

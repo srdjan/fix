@@ -1,4 +1,8 @@
-import { defineStep, execute, type Meta } from "../../packages/core/mod.ts";
+import {
+  createEngine,
+  defineStep,
+  type Meta,
+} from "../../packages/core/mod.ts";
 import { stdMacros } from "../../packages/std/mod.ts";
 import { fakeKv, fakeLogger } from "../../packages/testing/mod.ts";
 
@@ -51,19 +55,16 @@ function assert(condition: unknown, msg: string) {
 Deno.test("cache hydration uses fake logger", async () => {
   const base: Base = { tenantId: "green" };
 
-  const first = await execute(cacheStep, {
-    base,
+  const engine = createEngine<Base>({
     macros: stdMacros as any,
     env: testEnv,
   });
+
+  const first = await engine.run(cacheStep, base);
 
   assertEquals(first, "fresh:green");
 
-  const second = await execute(cacheStep, {
-    base,
-    macros: stdMacros as any,
-    env: testEnv,
-  });
+  const second = await engine.run(cacheStep, base);
 
   assertEquals(second, "fresh:green");
 

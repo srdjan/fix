@@ -59,21 +59,28 @@ export type Meta = {
 };
 
 // Build the capabilities object based on meta presence.
-export type CapsOf<M extends Meta, Scope> =
+type EffectCaps<M extends Meta> =
   & (M["http"] extends object ? { http: HttpPort } : {})
   & (M["kv"] extends object ? { kv: KvPort } : {})
   & (M["db"] extends object ? { db?: DbPort } : {})
-  & // db as effect port (optional) when not using tx
-  (M["queue"] extends object ? { queue: QueuePort } : {})
+  & (M["queue"] extends object ? { queue: QueuePort } : {})
   & (M["time"] extends object ? { time: TimePort } : {})
   & (M["crypto"] extends object ? { crypto: CryptoPort } : {})
-  & (M["log"] extends object ? { log: LogPort } : {})
-  & // resource lease openers, gated by meta
-  (M["db"] extends object ? { lease: Pick<LeasePort<Scope>, "db" | "tx"> } : {})
-  & (M["fs"] extends object ? { lease: Pick<LeasePort<Scope>, "tempDir"> } : {})
-  & (M["lock"] extends object ? { lease: Pick<LeasePort<Scope>, "lock"> } : {})
-  & (M["socket"] extends object ? { lease: Pick<LeasePort<Scope>, "socket"> }
-    : {})
+  & (M["log"] extends object ? { log: LogPort } : {});
+
+type LeaseCaps<M extends Meta, Scope> =
+  & (M["db"] extends object ? Pick<LeasePort<Scope>, "db" | "tx"> : {})
+  & (M["fs"] extends object ? Pick<LeasePort<Scope>, "tempDir"> : {})
+  & (M["lock"] extends object ? Pick<LeasePort<Scope>, "lock"> : {})
+  & (M["socket"] extends object ? Pick<LeasePort<Scope>, "socket"> : {});
+
+type MaybeLeaseCaps<M extends Meta, Scope> = keyof LeaseCaps<M, Scope> extends
+  never ? {}
+  : { lease: LeaseCaps<M, Scope> };
+
+export type CapsOf<M extends Meta, Scope> =
+  & EffectCaps<M>
+  & MaybeLeaseCaps<M, Scope>
   & { bracket: Bracket };
 
 export type ExecutionCtx<M extends Meta, Base, Scope> =
@@ -99,10 +106,9 @@ export type Macro<M, Caps> = {
 
 export type EngineConfig<Base, M extends Meta> = {
   base: Base;
-  // default macros include http/kv/db/fs/lock/socket/log/time/crypto + policies
   macros: Macro<M, object>[];
-  // host bindings; shape is up to macros
   env?: unknown;
+  validate?: boolean;
 };
 
 export type WeaveOptions = { getCircuit?: CircuitProvider };

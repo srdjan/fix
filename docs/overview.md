@@ -1,9 +1,9 @@
 # Overview
 
 `macrofx-unified` orchestrates **capabilities** (pure effect ports) and
-**leases** (scoped resources) through a single pipeline. You describe what a
-step needs in static `meta`, and the executor injects exactly those ports into
-`run(ctx)` at runtime while preserving compile-time safety.
+**leases** (scoped resources) through a single engine-driven pipeline. You
+describe what a step needs in static `meta`, and the engine injects exactly
+those ports into `run(ctx)` at runtime while preserving compile-time safety.
 
 ## Six-Phase Executor
 
@@ -19,8 +19,10 @@ step needs in static `meta`, and the executor injects exactly those ports into
 6. **after/onError** – allow macros to persist results, emit telemetry, or
    recover from failures.
 
-Because the pipeline is declarative, swapping hosts (Node, Deno, edge) or
-policies requires only meta tweaks rather than code edits.
+Because the pipeline is declarative, swapping hosts (Deno, edge, custom) or
+policies requires only meta tweaks rather than code edits. Instantiate the
+engine once (`createEngine` or `createStdEngine`) and reuse it across requests
+for consistent behaviour.
 
 ## Capabilities vs. Leases
 
@@ -56,8 +58,8 @@ timeout) and consistent for both ports and resource acquires.
 - **Meta-first** – type inference flows from the declarative `meta`, so
   consumers only access what they declare.
 - **Developer ergonomics** – `defineStep<Base>()` preserves literal inference
-  without verbose generic signatures. New fluent meta builder and step
-  composition utilities make complex workflows readable.
+  without verbose generic signatures. The shared engine API, fluent meta
+  builder, and step composition utilities make complex workflows readable.
 - **Host agnostic** – macros depend on host-provided factories (`makeHttp`,
   `makeDb`, …); swap `env` objects to target Node, Deno, workers, or tests.
 - **Testable** – `@macrofx/testing` supplies fakes; the executor accepts any env
@@ -66,15 +68,35 @@ timeout) and consistent for both ports and resource acquires.
 ## New Ergonomic Features
 
 ### Result Type
+
 Type-safe error handling without exceptions using `Result<T, E>` with functional
 combinators (`map`, `flatMap`, `matchResult`). Wrap steps with `withResult()` to
 return Results instead of throwing.
 
+### Engine API
+
+Create and reuse engines instead of hand-wiring macros for every run:
+
+```ts
+import { createStdEngine } from "@macrofx/std";
+
+const engine = createStdEngine<RequestCtx>({ validate: true });
+const result = await engine.run(step, base);
+```
+
+Validation can be toggled per engine or per run
+(`engine.run(step, base,
+{ validate: false })`). Convenience wrappers like
+`createStdEngine` bind the default macro set.
+
 ### Meta Builder
-Fluent API for building meta objects: `meta().withDb("ro").withKv("ns").build()`.
+
+Fluent API for building meta objects: `meta().withDb("ro").withKv("ns")`. Call
+`.build()` only when you need a plain object (e.g. for JSON serialisation).
 Compose meta with `mergeMeta()` and `extendMeta()`.
 
 ### Step Composition
+
 - `pipe()` – sequential pipelines
 - `allSteps()` – parallel execution
 - `race()` – first-to-complete
@@ -82,14 +104,17 @@ Compose meta with `mergeMeta()` and `extendMeta()`.
 - `conditional()` – if/else step selection
 
 ### Context Helpers
-Enhanced execution context with `ctx.span()`, `ctx.child()`, and `ctx.memo()` for
-telemetry, nested steps, and request-scoped caching.
+
+Enhanced execution context with `ctx.span()`, `ctx.child()`, and `ctx.memo()`
+for telemetry, nested steps, and request-scoped caching.
 
 ### Better Validation
+
 Helpful error messages with suggestions using Levenshtein distance for typo
 detection.
 
-For details, see [`docs/ergonomic-enhancements.md`](./ergonomic-enhancements.md).
+For details, see
+[`docs/ergonomic-enhancements.md`](./ergonomic-enhancements.md).
 
 For a tour of the API surface, see [`docs/api.md`](./api.md). Hands-on guides
 live in [`docs/examples.md`](./examples.md) and the new scenario docs referenced

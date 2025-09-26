@@ -1,7 +1,6 @@
-import { defineStep, execute } from "../../packages/core/mod.ts";
+import { defineStep } from "../../packages/core/mod.ts";
 import { pipe } from "../../packages/core/compose.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { createStdEngine } from "../../packages/std/mod.ts";
 import type { Meta } from "../../packages/core/types.ts";
 
 type Base = { userId: string };
@@ -47,10 +46,7 @@ const pipeline = pipe<Base>()(fetchUser, enrichProfile, cacheResult);
 
 console.log("\n=== Running Pipeline Example ===\n");
 
-const result = await execute(pipeline, {
-  base: { userId: "123" },
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const engine = createStdEngine<Base>();
+const result = await engine.run(pipeline, { userId: "123" });
 
 console.log("Pipeline result:", result);

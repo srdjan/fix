@@ -70,7 +70,7 @@ packages/
   resources/      # bracket + Lease<T,Scope> + tempDir + simple pool
     pool.ts       # Generic resource pooling
     fs.ts         # Temporary directory lease implementation
-  host-node/      # Node-compatible host bindings (fetch, crypto, fs, in-memory kv/db)
+  std/env.ts      # Default in-memory host bindings for demos/tests
   testing/        # Fakes, chaos injection, leak detection helpers
 ```
 
@@ -91,8 +91,8 @@ packages/
   compiler enforces this
 - **Declarative policies**: Add `retry`, `timeout`, `circuit`, `idempotency` in
   meta without touching business logic
-- **Host-agnostic**: Swap `host-node` (Node.js), `host-deno` (Deno), or write
-  custom host adapters
+- **Host-agnostic**: Extend `packages/std/env.ts` or supply your own factories
+  for real hosts
 - **Effect/resource unification**: One `meta`, one `CapsOf<M>`, one policy
   weaver for both
 
@@ -101,9 +101,9 @@ packages/
 Use `defineStep<Base, Scope>()` to create type-safe steps:
 
 ```typescript
-import { defineStep, execute } from "@macrofx/core";
+import { defineStep } from "@macrofx/core";
 import { stdMacros } from "@macrofx/std";
-import { hostNodeEnv } from "@macrofx/host-node";
+import { createStdEngine } from "@macrofx/std";
 
 type Base = { requestId: string; userId: string };
 
@@ -122,11 +122,8 @@ const step = defineStep<Base>()({
   },
 });
 
-const result = await execute(step, {
-  base: { requestId: "123", userId: "456" },
-  macros: stdMacros,
-  env: hostNodeEnv,
-});
+const engine = createStdEngine<Base>({ validate: true });
+const result = await engine.run(step, { requestId: "123", userId: "456" });
 ```
 
 ## Testing
@@ -138,17 +135,19 @@ const result = await execute(step, {
 Example with fakes:
 
 ```typescript
+import { createEngine } from "@macrofx/core";
 import { fakeKv, fakeLogger } from "@macrofx/testing";
 
 Deno.test("step with fakes", async () => {
   const kv = fakeKv();
   const log = fakeLogger();
 
-  const result = await execute(step, {
-    base: { userId: "test" },
+  const engine = createEngine<{ userId: string }>({
     macros: stdMacros,
     env: { makeKv: () => kv, makeLogger: () => log },
   });
+
+  const result = await engine.run(step, { userId: "test" });
 
   assertEquals(log.entries.length, 2);
 });
@@ -229,7 +228,7 @@ const macros = [...stdMacros, myMacro];
 Instead of throwing exceptions, steps can return `Result<T, E>`:
 
 ```typescript
-import { ok, err, map, flatMap, matchResult, type Result } from "@macrofx/core";
+import { err, flatMap, map, matchResult, ok, type Result } from "@macrofx/core";
 
 type FetchError = "NOT_FOUND" | "TIMEOUT";
 
@@ -242,20 +241,22 @@ const result = fetchUser("123");
 matchResult(
   result,
   (user) => console.log("Success:", user),
-  (error) => console.error("Error:", error)
+  (error) => console.error("Error:", error),
 );
 
 // Compose with map/flatMap
-const transformed = map(result, user => ({ ...user, active: true }));
+const transformed = map(result, (user) => ({ ...user, active: true }));
 ```
 
 Wrap steps to return Result instead of throwing:
 
 ```typescript
 import { withResult } from "@macrofx/core";
+import { createStdEngine } from "@macrofx/std";
 
+const engine = createStdEngine<Base>();
 const safeStep = withResult<Base>()(riskyStep);
-const result = await execute(safeStep, config); // Returns Result<Out, Error>
+const result = await engine.run(safeStep, base); // Returns Result<Out, Error>
 ```
 
 ### Meta Builder (Fluent API)
@@ -270,15 +271,14 @@ const myMeta = meta()
   .withKv("users")
   .withRetry(3, 100, true) // times, delayMs, jitter
   .withTimeout({ ms: 5000, acquireMs: 2000 })
-  .withLog("debug")
-  .build();
+  .withLog("debug");
 
 // Compose meta objects
-import { mergeMeta, extendMeta } from "@macrofx/core";
+import { extendMeta, mergeMeta } from "@macrofx/core";
 
-const baseMeta = meta().withLog("info").withRetry(3, 100).build();
-const dbMeta = meta().withDb("ro").withKv("cache").build();
-const combined = mergeMeta(baseMeta, dbMeta);
+const baseMeta = meta().withLog("info").withRetry(3, 100);
+const dbMeta = meta().withDb("ro").withKv("cache");
+const combined = mergeMeta(baseMeta.build(), dbMeta.build());
 ```
 
 ### Step Composition
@@ -286,15 +286,16 @@ const combined = mergeMeta(baseMeta, dbMeta);
 Compose steps into pipelines, parallel execution, and branches:
 
 ```typescript
-import { pipe, all, race, branch, conditional } from "@macrofx/core";
-import { P } from "ts-pattern";
+import { all, branch, conditional, pipe, race } from "@macrofx/core";
+import { createStdEngine } from "@macrofx/std";
 
 // Sequential pipeline
 const pipeline = pipe<Base>()(fetchUser, enrichProfile, cacheResult);
 
 // Parallel execution
 const parallel = all<Base>()(fetchUser, fetchOrders, fetchRecommendations);
-const [user, orders, recs] = await execute(parallel, config);
+const engine = createStdEngine<Base>();
+const [user, orders, recs] = await engine.run(parallel, base);
 
 // Race to first completion
 const fastest = race<Base>()(primaryDb, secondaryDb, cache);
@@ -309,7 +310,7 @@ const tieredStep = branch<"free" | "pro" | "enterprise", Base>(plan)
 const conditional = conditional<Base>()(
   (ctx) => ctx.isPremium,
   premiumStep,
-  standardStep
+  standardStep,
 );
 ```
 
@@ -343,7 +344,7 @@ async run(ctx) {
 Helpful validation with suggestions:
 
 ```typescript
-import { validateStep, assertValidStep } from "@macrofx/core";
+import { assertValidStep, validateStep } from "@macrofx/core";
 
 const result = validateStep(step, macros);
 if (!result.valid) {
@@ -381,9 +382,9 @@ console.log(interactions); // [{ method: "set", args: ["key", "value"], result: 
 
 Packages are published separately:
 
-- `@macrofx/core` - Core executor, Result type, meta builder, composition, validation
+- `@macrofx/core` - Core executor, Result type, meta builder, composition,
+  validation
 - `@macrofx/std` - Standard macros and policies
 - `@macrofx/ports` - Type-only port definitions
 - `@macrofx/resources` - Resource management utilities
-- `@macrofx/host-node` - Node.js host adapter
 - `@macrofx/testing` - Testing utilities, fakes, policy assertions, snapshots

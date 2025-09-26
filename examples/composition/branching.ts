@@ -1,8 +1,6 @@
-import { defineStep, execute } from "../../packages/core/mod.ts";
+import { defineStep } from "../../packages/core/mod.ts";
 import { branch } from "../../packages/core/compose.ts";
-import { P } from "ts-pattern";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { createStdEngine } from "../../packages/std/mod.ts";
 import type { Meta } from "../../packages/core/types.ts";
 
 type Base = { userId: string; plan: "free" | "pro" | "enterprise" };
@@ -53,11 +51,7 @@ const freeStep = branch<"free" | "pro" | "enterprise", Base>(freePlan.plan)
   .with("pro", proTierStep)
   .otherwise(enterpriseTierStep);
 
-const freeResult = await execute(freeStep, {
-  base: freePlan,
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const freeResult = await engine.run(freeStep, freePlan);
 
 console.log("Free tier result:", freeResult);
 
@@ -69,11 +63,7 @@ const proStep = branch<"free" | "pro" | "enterprise", Base>(proPlan.plan)
   .with("pro", proTierStep)
   .otherwise(enterpriseTierStep);
 
-const proResult = await execute(proStep, {
-  base: proPlan,
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const proResult = await engine.run(proStep, proPlan);
 
 console.log("Pro tier result:", proResult);
 
@@ -87,10 +77,7 @@ const enterpriseStep = branch<"free" | "pro" | "enterprise", Base>(
   .with("pro", proTierStep)
   .otherwise(enterpriseTierStep);
 
-const enterpriseResult = await execute(enterpriseStep, {
-  base: enterprisePlan,
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const enterpriseResult = await engine.run(enterpriseStep, enterprisePlan);
 
 console.log("Enterprise tier result:", enterpriseResult);
+const engine = createStdEngine<Base>();

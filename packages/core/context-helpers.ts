@@ -1,8 +1,13 @@
-import type { EngineConfig, ExecutionCtx, Meta, Step } from "./types.ts";
-import { execute } from "./executor.ts";
+import type { ExecutionCtx, Meta, Step } from "./types.ts";
+import type { Engine, EngineRunOptions } from "./executor.ts";
 
 type SpanOptions = {
   attributes?: Record<string, string | number | boolean>;
+};
+
+export type ChildRunOptions<Base> = {
+  base?: Base;
+  run?: EngineRunOptions;
 };
 
 export type ContextHelpers<M extends Meta, Base, Scope> = {
@@ -14,6 +19,7 @@ export type ContextHelpers<M extends Meta, Base, Scope> = {
   child<CM extends Meta, Out>(
     additionalMeta: CM,
     step: Step<CM, Base, Out, Scope>,
+    options?: ChildRunOptions<Base>,
   ): Promise<Out>;
   memo<R>(
     key: string,
@@ -25,7 +31,9 @@ const MEMO_SYMBOL = Symbol.for("macrofx.memo");
 const SPAN_SYMBOL = Symbol.for("macrofx.spans");
 
 type MemoStore = Map<string, any>;
-type SpanStore = Array<{ name: string; startTime: number; endTime?: number; error?: unknown }>;
+type SpanStore = Array<
+  { name: string; startTime: number; endTime?: number; error?: unknown }
+>;
 
 const getMemoStore = (ctx: any): MemoStore => {
   if (!ctx[MEMO_SYMBOL]) {
@@ -91,23 +99,27 @@ export const createSpan = <M extends Meta, Base, Scope, R>(
     });
 };
 
-export const createChild = async <M extends Meta, CM extends Meta, Base, Scope, Out>(
+export const createChild = async <
+  M extends Meta,
+  CM extends Meta,
+  Base,
+  Scope,
+  Out,
+  EM extends Meta,
+>(
+  engine: Engine<Base, EM>,
   parentCtx: ExecutionCtx<M, Base, Scope>,
   additionalMeta: CM,
   step: Step<CM, Base, Out, Scope>,
+  options?: ChildRunOptions<Base>,
 ): Promise<Out> => {
-  const cfg: EngineConfig<Base, CM> = {
-    base: parentCtx as unknown as Base,
-    macros: (parentCtx as any).__macros ?? [],
-    env: (parentCtx as any).__env,
-  };
-
   const childStep: Step<CM, Base, Out, Scope> = {
     ...step,
     meta: { ...step.meta, ...additionalMeta } as CM,
   };
 
-  return await execute(childStep as any, cfg);
+  const base = options?.base ?? parentCtx as unknown as Base;
+  return await engine.run(childStep as any, base, options?.run);
 };
 
 export const memoize = async <R>(
@@ -135,19 +147,40 @@ export const memoize = async <R>(
   return result;
 };
 
-export const attachContextHelpers = <M extends Meta, Base, Scope>(
+const ENGINE_SYMBOL = Symbol.for("macrofx.engine");
+
+export const attachContextHelpers = <
+  M extends Meta,
+  Base,
+  Scope,
+  EM extends Meta,
+>(
   ctx: ExecutionCtx<M, Base, Scope>,
+  engine: Engine<Base, EM>,
 ): ExecutionCtx<M, Base, Scope> & ContextHelpers<M, Base, Scope> => {
-  const enhanced = ctx as ExecutionCtx<M, Base, Scope> &
-    ContextHelpers<M, Base, Scope>;
+  const enhanced = ctx as
+    & ExecutionCtx<M, Base, Scope>
+    & ContextHelpers<M, Base, Scope>
+    & { [ENGINE_SYMBOL]: Engine<Base, EM> };
+
+  Object.defineProperty(enhanced, ENGINE_SYMBOL, {
+    value: engine,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
 
   enhanced.span = (name, fn, opts) => createSpan(ctx, name, fn, opts);
-  enhanced.child = (additionalMeta, step) =>
-    createChild(ctx, additionalMeta, step);
+  enhanced.child = (additionalMeta, step, opts) =>
+    createChild(engine, ctx, additionalMeta, step, opts);
   enhanced.memo = (key, fn) => memoize(ctx, key, fn);
 
   return enhanced;
 };
+
+export const getEngineFromContext = <Base, EM extends Meta = Meta>(
+  ctx: any,
+): Engine<Base, EM> | undefined => ctx?.[ENGINE_SYMBOL];
 
 export const getSpans = (ctx: any): ReadonlyArray<{
   name: string;

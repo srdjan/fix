@@ -1,10 +1,8 @@
-// Deno demo: in practice you can also run this under Node with tsx.
-// We simulate an endpoint that fetches a user (db) and caches it (kv),
+// Deno demo: we simulate an endpoint that fetches a user (db) and caches it (kv),
 // with retry + timeout + logging + tempDir resource.
 
-import { defineStep, execute, type Meta } from "../../packages/core/mod.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { defineStep, type Meta } from "../../packages/core/mod.ts";
+import { createStdEngine } from "../../packages/std/mod.ts";
 
 type Base = { requestId: string; userId: string };
 
@@ -44,10 +42,7 @@ const step = defineStep<Base>()({
 
 const base: Base = { requestId: crypto.randomUUID(), userId: "123" };
 
-const out = await execute(step, {
-  base,
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const engine = createStdEngine<Base>();
+const out = await engine.run(step, base);
 
 console.log("GET /users/123 →", out);

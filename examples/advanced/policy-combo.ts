@@ -1,6 +1,5 @@
-import { defineStep, execute, type Meta } from "../../packages/core/mod.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { defineStep, type Meta } from "../../packages/core/mod.ts";
+import { createStdEngine, stdEnv } from "../../packages/std/mod.ts";
 
 /**
  * Demonstrates retry + timeout + circuit breaker + idempotency working together
@@ -40,10 +39,10 @@ const flakyHttp = () => {
   };
 };
 
-const sharedKv = hostNodeEnv.makeKv("policy-demo");
+const sharedKv = stdEnv.makeKv("policy-demo");
 
 const policyEnv = {
-  ...hostNodeEnv,
+  ...stdEnv,
   makeHttp: () => flakyHttp(),
   makeKv: () => sharedKv,
 };
@@ -101,18 +100,12 @@ const base: Base = {
   idempotencyKey: "request-123",
 };
 
-const first = await execute(step, {
-  base,
-  macros: stdMacros as any,
-  env: policyEnv,
-});
+const engine = createStdEngine<Base>({ env: policyEnv, validate: true });
+
+const first = await engine.run(step, base);
 
 console.log("first run", first);
 
-const second = await execute(step, {
-  base,
-  macros: stdMacros as any,
-  env: policyEnv,
-});
+const second = await engine.run(step, base);
 
 console.log("second run (idempotent)", second);

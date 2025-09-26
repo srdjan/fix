@@ -1,4 +1,3 @@
-import { match, P } from "ts-pattern";
 import type {
   CapsOf,
   EngineConfig,
@@ -6,10 +5,11 @@ import type {
   Meta,
   Step,
 } from "./types.ts";
-import { execute } from "./executor.ts";
 import { mergeMeta } from "./meta-builder.ts";
 import type { Result } from "./result.ts";
 import { err, ok } from "./result.ts";
+import { getEngineFromContext } from "./context-helpers.ts";
+import { match, P } from "ts-pattern";
 
 type MergeMeta<M1 extends Meta, M2 extends Meta> = M1 & M2;
 
@@ -17,9 +17,11 @@ export const pipe = <Base, Scope = symbol>() => {
   return <Steps extends readonly Step<any, Base, any, Scope>[]>(
     ...steps: Steps
   ) => {
-    type Output = Steps extends readonly [...any, Step<any, Base, infer Out, Scope>] ? Out
+    type Output = Steps extends
+      readonly [...any, Step<any, Base, infer Out, Scope>] ? Out
       : never;
-    type MergedMeta = Steps extends readonly Step<infer M, Base, any, Scope>[] ? M
+    type MergedMeta = Steps extends readonly Step<infer M, Base, any, Scope>[]
+      ? M
       : never;
 
     return {
@@ -28,17 +30,29 @@ export const pipe = <Base, Scope = symbol>() => {
         (acc, s) => mergeMeta(acc as any, s.meta),
         {} as Meta,
       ) as MergedMeta,
-      run: async (ctx: ExecutionCtx<MergedMeta, Base, Scope>): Promise<Output> => {
+      run: async (
+        ctx: ExecutionCtx<MergedMeta, Base, Scope>,
+      ): Promise<Output> => {
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "pipe() requires execution through createEngine().run()",
+          );
+        }
+
         let result: any = ctx;
         for (const step of steps) {
-          const cfg: EngineConfig<Base, any> = {
-            base: { ...result, ...ctx } as Base,
-            macros: (ctx as any).__macros ?? [],
-            env: (ctx as any).__env,
-          };
-          result = await execute(step as any, cfg);
+          const baseForStep = (
+              result && typeof result === "object"
+            )
+            ? {
+              ...(result as Record<string, unknown>),
+              ...ctx,
+            } as Base
+            : ctx as unknown as Base;
+          result = await engine.run(step as any, baseForStep);
         }
-        return result;
+        return result as Output;
       },
     } as Step<MergedMeta, Base, Output, Scope>;
   };
@@ -49,10 +63,12 @@ export const all = <Base, Scope = symbol>() => {
     ...steps: Steps
   ) => {
     type Outputs = {
-      [K in keyof Steps]: Steps[K] extends Step<any, Base, infer Out, Scope> ? Out
+      [K in keyof Steps]: Steps[K] extends Step<any, Base, infer Out, Scope>
+        ? Out
         : never;
     };
-    type MergedMeta = Steps extends readonly Step<infer M, Base, any, Scope>[] ? M
+    type MergedMeta = Steps extends readonly Step<infer M, Base, any, Scope>[]
+      ? M
       : never;
 
     return {
@@ -61,14 +77,19 @@ export const all = <Base, Scope = symbol>() => {
         (acc, s) => mergeMeta(acc as any, s.meta),
         {} as Meta,
       ) as MergedMeta,
-      run: async (ctx: ExecutionCtx<MergedMeta, Base, Scope>): Promise<Outputs> => {
-        const cfg: EngineConfig<Base, any> = {
-          base: ctx as unknown as Base,
-          macros: (ctx as any).__macros ?? [],
-          env: (ctx as any).__env,
-        };
+      run: async (
+        ctx: ExecutionCtx<MergedMeta, Base, Scope>,
+      ): Promise<Outputs> => {
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "all() requires execution through createEngine().run()",
+          );
+        }
+
+        const baseForStep = ctx as unknown as Base;
         const results = await Promise.all(
-          steps.map((step) => execute(step as any, cfg)),
+          steps.map((step) => engine.run(step as any, baseForStep)),
         );
         return results as Outputs;
       },
@@ -82,7 +103,8 @@ export const race = <Base, Scope = symbol>() => {
   ) => {
     type Output = Steps[number] extends Step<any, Base, infer Out, Scope> ? Out
       : never;
-    type MergedMeta = Steps extends readonly Step<infer M, Base, any, Scope>[] ? M
+    type MergedMeta = Steps extends readonly Step<infer M, Base, any, Scope>[]
+      ? M
       : never;
 
     return {
@@ -91,14 +113,19 @@ export const race = <Base, Scope = symbol>() => {
         (acc, s) => mergeMeta(acc as any, s.meta),
         {} as Meta,
       ) as MergedMeta,
-      run: async (ctx: ExecutionCtx<MergedMeta, Base, Scope>): Promise<Output> => {
-        const cfg: EngineConfig<Base, any> = {
-          base: ctx as unknown as Base,
-          macros: (ctx as any).__macros ?? [],
-          env: (ctx as any).__env,
-        };
+      run: async (
+        ctx: ExecutionCtx<MergedMeta, Base, Scope>,
+      ): Promise<Output> => {
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "race() requires execution through createEngine().run()",
+          );
+        }
+
+        const baseForStep = ctx as unknown as Base;
         const result = await Promise.race(
-          steps.map((step) => execute(step as any, cfg)),
+          steps.map((step) => engine.run(step as any, baseForStep)),
         );
         return result as Output;
       },
@@ -147,11 +174,12 @@ export class Branch<V, Base, Scope = symbol> {
       name: `branch(${allSteps.map((s) => s.name).join(" | ")})`,
       meta: mergedMeta,
       run: async (ctx: any): Promise<any> => {
-        const cfg: EngineConfig<Base, any> = {
-          base: ctx as unknown as Base,
-          macros: ctx.__macros ?? [],
-          env: ctx.__env,
-        };
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "branch() requires execution through createEngine().run()",
+          );
+        }
 
         let matchedStep: Step<any, Base, any, Scope> | undefined;
 
@@ -176,7 +204,7 @@ export class Branch<V, Base, Scope = symbol> {
           }
         }
 
-        return await execute(matchedStep as any, cfg);
+        return await engine.run(matchedStep as any, ctx as unknown as Base);
       },
     };
   }
@@ -205,16 +233,19 @@ export const conditional = <Base, Scope = symbol>() => {
     return {
       name: `if(${ifTrue.name}, ${ifFalse.name})`,
       meta: mergedMeta,
-      run: async (ctx: ExecutionCtx<M1 & M2, Base, Scope>): Promise<Out1 | Out2> => {
-        const cfg: EngineConfig<Base, any> = {
-          base: ctx as unknown as Base,
-          macros: (ctx as any).__macros ?? [],
-          env: (ctx as any).__env,
-        };
+      run: async (
+        ctx: ExecutionCtx<M1 & M2, Base, Scope>,
+      ): Promise<Out1 | Out2> => {
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "conditional() requires execution through createEngine().run()",
+          );
+        }
 
         const condition = await predicate(ctx as unknown as Base);
         const step = condition ? ifTrue : ifFalse;
-        return await execute(step as any, cfg);
+        return await engine.run(step as any, ctx as unknown as Base);
       },
     };
   };
@@ -230,16 +261,19 @@ export const retry = <Base, Scope = symbol>() => {
       name: `retry(${step.name}, ${times})`,
       meta: step.meta,
       run: async (ctx: ExecutionCtx<M, Base, Scope>): Promise<Out> => {
-        const cfg: EngineConfig<Base, any> = {
-          base: ctx as unknown as Base,
-          macros: (ctx as any).__macros ?? [],
-          env: (ctx as any).__env,
-        };
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "retry() requires execution through createEngine().run()",
+          );
+        }
+
+        const base = ctx as unknown as Base;
 
         let lastError: unknown;
         for (let i = 0; i <= times; i++) {
           try {
-            return await execute(step as any, cfg);
+            return await engine.run(step as any, base);
           } catch (e) {
             lastError = e;
             if (i < times) {
@@ -262,18 +296,19 @@ export const timeout = <Base, Scope = symbol>() => {
       name: `timeout(${step.name}, ${ms}ms)`,
       meta: step.meta,
       run: async (ctx: ExecutionCtx<M, Base, Scope>): Promise<Out> => {
-        const cfg: EngineConfig<Base, any> = {
-          base: ctx as unknown as Base,
-          macros: (ctx as any).__macros ?? [],
-          env: (ctx as any).__env,
-        };
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "timeout() requires execution through createEngine().run()",
+          );
+        }
 
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Step timeout")), ms)
         );
 
         return await Promise.race([
-          execute(step as any, cfg),
+          engine.run(step as any, ctx as unknown as Base),
           timeoutPromise,
         ]) as Out;
       },
@@ -291,14 +326,15 @@ export const withResult = <Base, Scope = symbol>() => {
       run: async (
         ctx: ExecutionCtx<M, Base, Scope>,
       ): Promise<Result<Out, Error>> => {
-        const cfg: EngineConfig<Base, any> = {
-          base: ctx as unknown as Base,
-          macros: (ctx as any).__macros ?? [],
-          env: (ctx as any).__env,
-        };
+        const engine = getEngineFromContext<Base>(ctx);
+        if (!engine) {
+          throw new Error(
+            "withResult() requires execution through createEngine().run()",
+          );
+        }
 
         try {
-          const result = await execute(step as any, cfg);
+          const result = await engine.run(step as any, ctx as unknown as Base);
           return ok(result) as Result<Out, Error>;
         } catch (e) {
           return err(e instanceof Error ? e : new Error(String(e)));

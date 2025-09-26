@@ -31,7 +31,7 @@ meta: {
   stampedes.
 - Provide an `env.makeCircuit(name, policy)` function to persist breaker state
   across executions (the Node host does this by default). Without it, circuits
-  reset on every `execute` call.
+  reset on every engine run.
 
 ## Retry
 
@@ -82,7 +82,8 @@ meta: {
   data or alternate ports (`kv`, `queue`). Logs retain the underlying failure
   cause.
 - **Resource hygiene**: place nested `lease.*` operations inside `bracket` even
-  when also using timeouts to guarantee release.
+  when also using timeouts to guarantee release. Lease retries honour jitter and
+  logging just like effect ports.
 - **Macro-driven recovery**: custom macros can populate
   `setMacroResult(ctx, value)` to short-circuit on known failure scenarios (e.g.
   golden cache, feature flag) without leaking implementation details through the

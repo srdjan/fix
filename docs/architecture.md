@@ -19,8 +19,8 @@ meta ---> |  Macro Registry   | --resolve--> capabilities (ports/openers)
 - `packages/core` hosts the executor, types, bracket, and policy weaver.
 - `packages/std` provides built-in macros for common ports, leases, and policies
   (including idempotency and the in-memory circuit breaker).
-- `packages/host-node` supplies Node-compatible host bindings used by std
-  macros.
+- `packages/std/env.ts` provides default in-memory host bindings used by std
+  macros; swap or extend these functions to target real infrastructure.
 - `packages/resources` contains pooling utilities and the `tempDir` lease
   implementation.
 - `packages/testing` exposes fakes and helpers (`fakeLogger`, chaos utilities)

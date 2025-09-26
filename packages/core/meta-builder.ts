@@ -1,6 +1,6 @@
 import type { Meta } from "./types.ts";
 
-export type MetaBuilder<M extends Partial<Meta> = {}> = {
+type MetaBuilderMethods<M extends Partial<Meta>> = {
   withHttp(baseUrl?: string, auth?: "bearer" | "none"): MetaBuilder<
     M & { http: { baseUrl?: string; auth?: "bearer" | "none" } }
   >;
@@ -33,7 +33,9 @@ export type MetaBuilder<M extends Partial<Meta> = {}> = {
     mode?: "exclusive" | "shared";
     ttlMs?: number;
   }): MetaBuilder<
-    M & { lock: { key?: string; mode?: "exclusive" | "shared"; ttlMs?: number } }
+    M & {
+      lock: { key?: string; mode?: "exclusive" | "shared"; ttlMs?: number };
+    }
   >;
   withSocket(opts?: {
     host?: string;
@@ -43,7 +45,9 @@ export type MetaBuilder<M extends Partial<Meta> = {}> = {
     times: number,
     delayMs: number,
     jitter?: boolean,
-  ): MetaBuilder<M & { retry: { times: number; delayMs: number; jitter?: boolean } }>;
+  ): MetaBuilder<
+    M & { retry: { times: number; delayMs: number; jitter?: boolean } }
+  >;
   withTimeout(opts?: {
     ms?: number;
     acquireMs?: number;
@@ -59,117 +63,100 @@ export type MetaBuilder<M extends Partial<Meta> = {}> = {
   build(): M & Meta;
 };
 
-class MetaBuilderImpl<M extends Partial<Meta>> implements MetaBuilder<M> {
-  constructor(private readonly meta: M) {}
+export type MetaBuilder<M extends Partial<Meta> = {}> =
+  & MetaBuilderMethods<M>
+  & (M & Meta);
 
-  withHttp(baseUrl?: string, auth?: "bearer" | "none") {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      http: { baseUrl, auth },
-    } as any);
-  }
+const createMetaBuilder = <M extends Partial<Meta>>(
+  metaState: M,
+): MetaBuilder<M> => {
+  const buildNext = <Extra extends Partial<Meta>>(
+    extra: Extra,
+  ): MetaBuilder<M & Extra> =>
+    createMetaBuilder(
+      {
+        ...metaState,
+        ...extra,
+      } as M & Extra,
+    );
 
-  withKv(namespace: string) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      kv: { namespace },
-    } as any);
-  }
+  const base: Record<string, unknown> = { ...metaState };
 
-  withDb(role: "ro" | "rw", tx?: "required" | "new" | "none") {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      db: { role, tx },
-    } as any);
-  }
+  const define = <K extends keyof MetaBuilderMethods<M>>(
+    key: K,
+    value: MetaBuilderMethods<M>[K],
+  ) => {
+    Object.defineProperty(base, key, {
+      value,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
+  };
 
-  withQueue(name: string) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      queue: { name },
-    } as any);
-  }
-
-  withTime() {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      time: {},
-    } as any);
-  }
-
-  withCrypto(opts?: { uuid?: true; hash?: "sha256" | "none" }) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      crypto: opts ?? {},
-    } as any);
-  }
-
-  withLog(level: "debug" | "info" | "warn" | "error") {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      log: { level },
-    } as any);
-  }
-
-  withFs(opts?: { tempDir?: true; workDirPrefix?: string }) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      fs: opts ?? {},
-    } as any);
-  }
-
-  withLock(opts?: {
+  define(
+    "withHttp",
+    (baseUrl?: string, auth?: "bearer" | "none") =>
+      buildNext({ http: { baseUrl, auth } }),
+  );
+  define("withKv", (namespace: string) => buildNext({ kv: { namespace } }));
+  define(
+    "withDb",
+    (role: "ro" | "rw", tx?: "required" | "new" | "none") =>
+      buildNext({ db: { role, tx } }),
+  );
+  define("withQueue", (name: string) => buildNext({ queue: { name } }));
+  define("withTime", () => buildNext({ time: {} }));
+  define(
+    "withCrypto",
+    (opts?: { uuid?: true; hash?: "sha256" | "none" }) =>
+      buildNext({ crypto: opts ?? {} }),
+  );
+  define(
+    "withLog",
+    (level: "debug" | "info" | "warn" | "error") =>
+      buildNext({ log: { level } }),
+  );
+  define(
+    "withFs",
+    (opts?: { tempDir?: true; workDirPrefix?: string }) =>
+      buildNext({ fs: opts ?? {} }),
+  );
+  define("withLock", (opts?: {
     key?: string;
     mode?: "exclusive" | "shared";
     ttlMs?: number;
-  }) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      lock: opts ?? {},
-    } as any);
-  }
+  }) => buildNext({ lock: opts ?? {} }));
+  define(
+    "withSocket",
+    (opts?: { host?: string; port?: number }) =>
+      buildNext({ socket: opts ?? {} }),
+  );
+  define(
+    "withRetry",
+    (times: number, delayMs: number, jitter?: boolean) =>
+      buildNext({ retry: { times, delayMs, jitter } }),
+  );
+  define(
+    "withTimeout",
+    (opts?: { ms?: number; acquireMs?: number }) =>
+      buildNext({ timeout: opts ?? {} }),
+  );
+  define(
+    "withIdempotency",
+    (key: string, ttlMs?: number) => buildNext({ idempotency: { key, ttlMs } }),
+  );
+  define(
+    "withCircuit",
+    (name: string, halfOpenAfterMs?: number) =>
+      buildNext({ circuit: { name, halfOpenAfterMs } }),
+  );
+  define("build", () => metaState as M & Meta);
 
-  withSocket(opts?: { host?: string; port?: number }) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      socket: opts ?? {},
-    } as any);
-  }
+  return base as MetaBuilder<M>;
+};
 
-  withRetry(times: number, delayMs: number, jitter?: boolean) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      retry: { times, delayMs, jitter },
-    } as any);
-  }
-
-  withTimeout(opts?: { ms?: number; acquireMs?: number }) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      timeout: opts ?? {},
-    } as any);
-  }
-
-  withIdempotency(key: string, ttlMs?: number) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      idempotency: { key, ttlMs },
-    } as any);
-  }
-
-  withCircuit(name: string, halfOpenAfterMs?: number) {
-    return new MetaBuilderImpl({
-      ...this.meta,
-      circuit: { name, halfOpenAfterMs },
-    } as any);
-  }
-
-  build(): M & Meta {
-    return this.meta as M & Meta;
-  }
-}
-
-export const meta = (): MetaBuilder<{}> => new MetaBuilderImpl({});
+export const meta = (): MetaBuilder<{}> => createMetaBuilder({});
 
 export const mergeMeta = <M1 extends Meta, M2 extends Meta>(
   m1: M1,

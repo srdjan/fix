@@ -1,16 +1,11 @@
-import { defineStep, execute } from "../../packages/core/mod.ts";
+import { defineStep, createEngine } from "../../packages/core/mod.ts";
 import { withResult } from "../../packages/core/compose.ts";
 import {
-  err,
-  isErr,
   isOk,
   map,
   matchResult,
-  ok,
   type Result,
 } from "../../packages/core/result.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
 import type { Meta } from "../../packages/core/types.ts";
 
 type Base = { userId: string };
@@ -38,11 +33,9 @@ console.log("\n=== Running Result-Based Error Handling (Success) ===\n");
 
 const successStep = withResult<Base>()(riskyFetchStep);
 
-const successResult = await execute(successStep, {
-  base: { userId: "123" },
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const engine = createEngine<Base>();
+
+const successResult = await engine.run(successStep, { userId: "123" });
 
 matchResult(
   successResult,
@@ -54,11 +47,7 @@ console.log("\n=== Running Result-Based Error Handling (Failure) ===\n");
 
 const failureStep = withResult<Base>()(riskyFetchStep);
 
-const failureResult = await execute(failureStep, {
-  base: { userId: "missing" },
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const failureResult = await engine.run(failureStep, { userId: "missing" });
 
 matchResult(
   failureResult,

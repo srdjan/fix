@@ -1,7 +1,10 @@
-import { defineStep, execute } from "../../packages/core/mod.ts";
-import { extendMeta, mergeMeta, meta } from "../../packages/core/meta-builder.ts";
-import { stdMacros } from "../../packages/std/mod.ts";
-import { hostNodeEnv } from "../../packages/host-node/mod.ts";
+import { defineStep } from "../../packages/core/mod.ts";
+import {
+  extendMeta,
+  mergeMeta,
+  meta,
+} from "../../packages/core/meta-builder.ts";
+import { createStdEngine } from "../../packages/std/mod.ts";
 
 type Base = { userId: string };
 
@@ -37,11 +40,8 @@ const step = defineStep<Base>()({
 
 console.log("\n=== Executing with Composed Meta ===\n");
 
-const result = await execute(step, {
-  base: { userId: "comp-123" },
-  macros: stdMacros as any,
-  env: hostNodeEnv,
-});
+const engine = createStdEngine<Base>();
+const result = await engine.run(step, { userId: "comp-123" });
 
 console.log("Result:", result);
 
