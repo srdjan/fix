@@ -129,6 +129,99 @@ function wrapLog<T extends object>(port: T, logger: any, family: string): T {
   ) as T;
 }
 
+type MaybeReleasable = { release?: () => Promise<void> };
+
+function withAcquireTimeout(
+  acquire: (...args: any[]) => Promise<MaybeReleasable>,
+  ms: number,
+): (...args: any[]) => Promise<MaybeReleasable> {
+  return async (...args: any[]) => {
+    const timeoutError = new Error("acquire-timeout");
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const acquirePromise = Promise.resolve(acquire(...args));
+
+    acquirePromise.then(
+      async (res) => {
+        if (timer) clearTimeout(timer);
+        timer = undefined;
+        if (timedOut && res && typeof res.release === "function") {
+          try {
+            await res.release();
+          } catch {
+            // swallow release failures after timeout
+          }
+        }
+      },
+      () => {
+        if (timer) clearTimeout(timer);
+        timer = undefined;
+      },
+    );
+
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        reject(timeoutError);
+      }, ms);
+    });
+
+    return await Promise.race([
+      acquirePromise,
+      timeoutPromise,
+    ]) as MaybeReleasable;
+  };
+}
+
+function wrapAcquire(
+  fn: (...args: any[]) => Promise<MaybeReleasable>,
+  label: string,
+  opts: {
+    log?: any;
+    timeout?: Meta["timeout"];
+    retry?: Meta["retry"];
+    circuit?: Meta["circuit"];
+    getCircuit?: CircuitProvider;
+  },
+): (...args: any[]) => Promise<MaybeReleasable> {
+  let acquire = (...args: any[]) => fn(...args);
+
+  if (opts.timeout?.acquireMs) {
+    acquire = withAcquireTimeout(acquire, opts.timeout.acquireMs);
+  }
+
+  if (opts.circuit) {
+    const wrapped = wrapCircuit(
+      { acquire } as { acquire: typeof acquire },
+      opts.circuit,
+      opts.log,
+      label,
+      opts.getCircuit,
+    );
+    acquire = wrapped.acquire;
+  }
+
+  if (opts.log) {
+    const wrapped = wrapLog(
+      { acquire } as { acquire: typeof acquire },
+      opts.log,
+      label,
+    );
+    acquire = wrapped.acquire;
+  }
+
+  if (opts.retry) {
+    const wrapped = wrapRetry(
+      { acquire } as { acquire: typeof acquire },
+      opts.retry,
+    );
+    acquire = wrapped.acquire;
+  }
+
+  return (...args: any[]) => acquire(...args);
+}
+
 export function weave(
   meta: Meta,
   caps: any,
@@ -157,61 +250,30 @@ export function weave(
   wrapPort("queue");
 
   // resource openers: only apply acquire timeout/retry wrappers
-  const wrapAcquire = (fn: Function, label: string) => {
-    let baseAcquire = async (...args: any[]) => await fn(...args);
-
-    if (meta.timeout?.acquireMs) {
-      const ms = meta.timeout.acquireMs;
-      const original = baseAcquire;
-      baseAcquire = (...args: any[]) =>
-        withTimeout(Promise.resolve(original(...args)), ms, "acquire-timeout");
-    }
-
-    if (circuit) {
-      const wrapped = wrapCircuit(
-        { acquire: baseAcquire } as any,
-        circuit,
-        log,
-        label,
-        opts?.getCircuit,
-      );
-      baseAcquire = (...args: any[]) => wrapped.acquire(...args);
-    }
-
-    if (!retry) {
-      return baseAcquire;
-    }
-
-    return async (...args: any[]) => {
-      let attempt = 0, lastErr: unknown;
-      while (attempt <= retry.times) {
-        try {
-          return await baseAcquire(...args);
-        } catch (e) {
-          lastErr = e;
-          await sleep(retry.delayMs);
-          attempt++;
-        }
-      }
-      throw lastErr;
-    };
-  };
-
   if (out.lease) {
+    const acquirePolicies = {
+      log,
+      timeout,
+      retry,
+      circuit,
+      getCircuit: opts?.getCircuit,
+    } as const;
+
+    const wrapLeaseFn = <F extends (...args: any[]) => Promise<any>>(
+      fn: F | undefined,
+      label: string,
+    ): F | undefined => {
+      if (!fn) return undefined;
+      return wrapAcquire(fn as any, label, acquirePolicies) as F;
+    };
+
     out.lease = {
       ...out.lease,
-      db: out.lease.db &&
-        ((role: "ro" | "rw") => wrapAcquire(out.lease.db, "lease.db")(role)),
+      db: wrapLeaseFn(out.lease.db, "lease.db"),
       tx: out.lease.tx && (async (fn: any) => out.lease.tx(fn)), // tx itself has its own bracket
-      tempDir: out.lease.tempDir &&
-        ((prefix?: string) =>
-          wrapAcquire(out.lease.tempDir, "lease.tempDir")(prefix)),
-      lock: out.lease.lock &&
-        ((key: string, mode?: string) =>
-          wrapAcquire(out.lease.lock, "lease.lock")(key, mode)),
-      socket: out.lease.socket &&
-        ((host: string, port: number) =>
-          wrapAcquire(out.lease.socket, "lease.socket")(host, port)),
+      tempDir: wrapLeaseFn(out.lease.tempDir, "lease.tempDir"),
+      lock: wrapLeaseFn(out.lease.lock, "lease.lock"),
+      socket: wrapLeaseFn(out.lease.socket, "lease.socket"),
     };
   }
 

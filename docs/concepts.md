@@ -18,4 +18,4 @@
   supplied at runtime; swap hosts to change environment without rewriting steps.
 - **Execution Context**: `Base & CapsOf<M, Scope> & { meta: M }` – the value
   your step receives in `run`. Reads are type-safe, writes are discouraged
-  except for macro communication (e.g. `__macrofxSkip`).
+  except for macro communication via helpers like `setMacroResult`.

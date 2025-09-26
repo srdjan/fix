@@ -53,10 +53,9 @@ export type Meta = {
 
   // policies
   retry?: { times: number; delayMs: number; jitter?: boolean };
-  timeout?: { ms?: number; acquireMs?: number; holdMs?: number };
+  timeout?: { ms?: number; acquireMs?: number };
   idempotency?: { key: string; ttlMs?: number };
   circuit?: { name: string; halfOpenAfterMs?: number };
-  telemetry?: { span?: string };
 };
 
 // Build the capabilities object based on meta presence.
