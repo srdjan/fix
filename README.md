@@ -64,24 +64,123 @@ macrofx-unified/
 - **Testable**: pass `@macrofx/testing` fakes into the executor; everything is
   functions.
 
+## Key Features
+
+### 🔧 Ergonomic Meta Builder
+
+Build meta declaratively with type-safe chaining:
+
+```typescript
+import { meta } from "@macrofx/core";
+
+const myMeta = meta()
+  .withDb("ro")
+  .withKv("users")
+  .withRetry(3, 100, true)
+  .withTimeout({ ms: 5000 })
+  .withLog("debug")
+  .build();
+```
+
+### 🔄 Step Composition
+
+Compose steps into pipelines, parallel execution, and branches:
+
+```typescript
+import { pipe, allSteps, race, branch } from "@macrofx/core";
+
+// Sequential pipeline
+const pipeline = pipe<Base>()(fetchUser, enrichProfile, cacheResult);
+
+// Parallel execution
+const parallel = allSteps<Base>()(fetchData, fetchOrders, fetchRecs);
+
+// Pattern-matched branching with ts-pattern
+const tiered = branch<"free" | "pro" | "enterprise", Base>(plan)
+  .with("free", freeTierStep)
+  .with("pro", proTierStep)
+  .otherwise(enterpriseTierStep);
+```
+
+### ✅ Result Type for Error Handling
+
+Type-safe error handling without exceptions:
+
+```typescript
+import { ok, err, map, matchResult, withResult, type Result } from "@macrofx/core";
+
+const safeStep = withResult<Base>()(riskyStep);
+const result = await execute(safeStep, config);
+
+matchResult(
+  result,
+  (data) => console.log("Success:", data),
+  (error) => console.error("Error:", error)
+);
+```
+
+### 🎯 Enhanced Context Helpers
+
+```typescript
+async run(ctx) {
+  // Telemetry spans
+  return await ctx.span("fetch-user", async (ctx) => {
+    return await ctx.kv.get(key);
+  });
+
+  // Request-scoped memoization
+  const cached = await ctx.memo("expensive", () => compute());
+
+  // Spawn child steps
+  const result = await ctx.child({ http: { baseUrl: "..." } }, apiStep);
+}
+```
+
+### 🛡️ Better Validation & Error Messages
+
+```typescript
+import { validateStep, assertValidStep } from "@macrofx/core";
+
+// Helpful errors with suggestions
+// [UNKNOWN_CAPABILITY] Step declares 'redis' but no matching macro registered
+// 💡 Did you mean 'kv'? Add the corresponding macro to your macros array
+```
+
 ## Examples
 
-- `examples/deno/api.ts` — an HTTP-like example (without needing real DB/Redis);
-  shows cache + db + retry + timeout + bracket temp dir.
-- `examples/advanced/multi-resource.ts` — nested leases (lock + db + tempDir)
-  with manual finalisers.
-- `examples/advanced/policy-combo.ts` — retry + timeout + circuit breaker +
-  idempotency with explicit error handling.
-- `examples/testing/with-fakes.test.ts` — demonstrates using `@macrofx/testing`
-  fakes inside Deno tests.
+### Core Examples
+- `examples/deno/api.ts` — HTTP-like example with cache + db + retry + timeout
+- `examples/advanced/multi-resource.ts` — Nested leases with finalisers
+- `examples/advanced/policy-combo.ts` — Retry + timeout + circuit breaker
+- `examples/testing/with-fakes.test.ts` — Using `@macrofx/testing` fakes
+
+### New Ergonomic Examples
+- `examples/composition/pipeline.ts` — Sequential pipeline with `pipe()`
+- `examples/composition/parallel.ts` — Parallel execution with `allSteps()`
+- `examples/composition/branching.ts` — Pattern-matched branching with ts-pattern
+- `examples/result-based/error-handling.ts` — Result type with steps
+- `examples/result-based/chaining.ts` — Result combinators
+- `examples/builder/fluent-meta.ts` — Meta builder usage
+- `examples/builder/meta-composition.ts` — Composing meta objects
 
 ## Testing helpers
 
-- `fakeLogger()` captures structured logs for assertions.
-- `fakeKv()` / `fakeHttp()` / `fakeTime()` provide deterministic, stateful
-  ports.
-- `withChaos()` wraps any port with configurable failure or latency injection
-  for resilience testing.
+- `fakeLogger()` captures structured logs for assertions
+- `fakeKv()` / `fakeHttp()` / `fakeTime()` provide deterministic ports
+- `withChaos()` wraps ports with configurable failure/latency injection
+- `createPolicyTracker()` tracks and asserts on policy execution
+- `snapshotPort()` records all port interactions for testing
+
+## Documentation
+
+- [Overview](./docs/overview.md) - High-level concepts and architecture
+- [Concepts](./docs/concepts.md) - Core terminology and patterns
+- [API Reference](./docs/api.md) - Detailed API documentation
+- [Architecture](./docs/architecture.md) - System design and execution flow
+- [Testing Guide](./docs/testing.md) - Testing strategies and utilities
+- [Policies](./docs/policies.md) - Policy configuration and composition
+- [Examples Guide](./docs/examples.md) - Detailed example walkthroughs
+- [Ergonomic Enhancements](./docs/ergonomic-enhancements.md) - New features guide
 
 ## Publishing strategy
 

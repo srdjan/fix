@@ -10,5 +10,8 @@
     "rules": {
       "exclude": ["no-explicit-any"]
     }
+  },
+  "imports": {
+    "ts-pattern": "npm:ts-pattern@^5.0.0"
   }
 }

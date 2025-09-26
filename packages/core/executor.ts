@@ -8,6 +8,7 @@ import {
   type Meta,
   type Step,
 } from "./types.ts";
+import { attachContextHelpers } from "./context-helpers.ts";
 
 export async function execute<M extends Meta, Base, Out, Scope>(
   step: Step<M, Base, Out, Scope>,
@@ -43,6 +44,10 @@ export async function execute<M extends Meta, Base, Out, Scope>(
     }),
   };
   ctx.meta = step.meta;
+  ctx.__macros = macros;
+  ctx.__env = env;
+
+  attachContextHelpers(ctx);
 
   // 4) before guards
   for (const m of macros) {

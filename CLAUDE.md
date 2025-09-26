@@ -222,13 +222,168 @@ const macros = [...stdMacros, myMacro];
 - Use `setMacroResult(ctx, value)` in a before-hook to skip `run` phase
 - Common for idempotency checks or cached responses
 
+## New Ergonomic Features
+
+### Result Type for Error Handling
+
+Instead of throwing exceptions, steps can return `Result<T, E>`:
+
+```typescript
+import { ok, err, map, flatMap, matchResult, type Result } from "@macrofx/core";
+
+type FetchError = "NOT_FOUND" | "TIMEOUT";
+
+const fetchUser = (id: string): Result<User, FetchError> => {
+  if (id === "missing") return err("NOT_FOUND");
+  return ok({ id, name: "Ada" });
+};
+
+const result = fetchUser("123");
+matchResult(
+  result,
+  (user) => console.log("Success:", user),
+  (error) => console.error("Error:", error)
+);
+
+// Compose with map/flatMap
+const transformed = map(result, user => ({ ...user, active: true }));
+```
+
+Wrap steps to return Result instead of throwing:
+
+```typescript
+import { withResult } from "@macrofx/core";
+
+const safeStep = withResult<Base>()(riskyStep);
+const result = await execute(safeStep, config); // Returns Result<Out, Error>
+```
+
+### Meta Builder (Fluent API)
+
+Build meta declaratively with type-safe chaining:
+
+```typescript
+import { meta } from "@macrofx/core";
+
+const myMeta = meta()
+  .withDb("ro")
+  .withKv("users")
+  .withRetry(3, 100, true) // times, delayMs, jitter
+  .withTimeout({ ms: 5000, acquireMs: 2000 })
+  .withLog("debug")
+  .build();
+
+// Compose meta objects
+import { mergeMeta, extendMeta } from "@macrofx/core";
+
+const baseMeta = meta().withLog("info").withRetry(3, 100).build();
+const dbMeta = meta().withDb("ro").withKv("cache").build();
+const combined = mergeMeta(baseMeta, dbMeta);
+```
+
+### Step Composition
+
+Compose steps into pipelines, parallel execution, and branches:
+
+```typescript
+import { pipe, all, race, branch, conditional } from "@macrofx/core";
+import { P } from "ts-pattern";
+
+// Sequential pipeline
+const pipeline = pipe<Base>()(fetchUser, enrichProfile, cacheResult);
+
+// Parallel execution
+const parallel = all<Base>()(fetchUser, fetchOrders, fetchRecommendations);
+const [user, orders, recs] = await execute(parallel, config);
+
+// Race to first completion
+const fastest = race<Base>()(primaryDb, secondaryDb, cache);
+
+// Branch with ts-pattern
+const tieredStep = branch<"free" | "pro" | "enterprise", Base>(plan)
+  .with("free", freeTierStep)
+  .with("pro", proTierStep)
+  .otherwise(enterpriseTierStep);
+
+// Conditional execution
+const conditional = conditional<Base>()(
+  (ctx) => ctx.isPremium,
+  premiumStep,
+  standardStep
+);
+```
+
+### Context Helpers
+
+Enhanced execution context with utility methods:
+
+```typescript
+async run(ctx) {
+  // Telemetry spans
+  return await ctx.span("fetch-user", async (ctx) => {
+    const user = await ctx.kv.get(key);
+    return user;
+  });
+
+  // Request-scoped memoization
+  const cachedResult = await ctx.memo("expensive-calc", () => {
+    return heavyComputation();
+  });
+
+  // Spawn child steps with additional capabilities
+  const result = await ctx.child(
+    { http: { baseUrl: "https://api.example.com" } },
+    apiCallStep
+  );
+}
+```
+
+### Enhanced Validation & Error Messages
+
+Helpful validation with suggestions:
+
+```typescript
+import { validateStep, assertValidStep } from "@macrofx/core";
+
+const result = validateStep(step, macros);
+if (!result.valid) {
+  console.error(formatValidationErrors(result.errors));
+  // Output:
+  // 1. [UNKNOWN_CAPABILITY] Step declares capability 'redis' but no matching macro is registered
+  //    💡 Did you mean 'kv'? Add the corresponding macro to your macros array
+}
+
+// Throws with detailed message
+assertValidStep(step, macros);
+```
+
+### Testing Enhancements
+
+New testing utilities for policy assertions and snapshots:
+
+```typescript
+import { createPolicyTracker, snapshotPort } from "@macrofx/testing";
+
+// Track and assert on policies
+const tracker = createPolicyTracker();
+// ... execute steps ...
+tracker.assertions.expectRetried(3);
+tracker.assertions.expectCircuitOpen("api");
+tracker.assertions.expectIdempotencyHit("req-123");
+
+// Snapshot port interactions
+const { port, interactions } = snapshotPort(kvPort);
+await port.set("key", "value");
+console.log(interactions); // [{ method: "set", args: ["key", "value"], result: undefined }]
+```
+
 ## Publishing Strategy
 
 Packages are published separately:
 
-- `@macrofx/core` - Core executor and types
+- `@macrofx/core` - Core executor, Result type, meta builder, composition, validation
 - `@macrofx/std` - Standard macros and policies
 - `@macrofx/ports` - Type-only port definitions
 - `@macrofx/resources` - Resource management utilities
 - `@macrofx/host-node` - Node.js host adapter
-- `@macrofx/testing` - Testing utilities and fakes
+- `@macrofx/testing` - Testing utilities, fakes, policy assertions, snapshots

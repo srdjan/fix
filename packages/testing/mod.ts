@@ -184,3 +184,124 @@ export function withChaos<T extends object>(
 
   return wrapped as T;
 }
+
+export type PolicyAssertion = {
+  expectRetried(times: number): void;
+  expectCircuitOpen(name: string): void;
+  expectCircuitClosed(name: string): void;
+  expectTimedOut(): void;
+  expectIdempotencyHit(key: string): void;
+};
+
+export function createPolicyTracker() {
+  const retries = new Map<string, number>();
+  const circuits = new Map<string, "open" | "closed">();
+  const timeouts: string[] = [];
+  const idempotencyHits = new Set<string>();
+
+  return {
+    trackRetry(method: string) {
+      retries.set(method, (retries.get(method) ?? 0) + 1);
+    },
+    trackCircuit(name: string, state: "open" | "closed") {
+      circuits.set(name, state);
+    },
+    trackTimeout(method: string) {
+      timeouts.push(method);
+    },
+    trackIdempotencyHit(key: string) {
+      idempotencyHits.add(key);
+    },
+    assertions: {
+      expectRetried(times: number) {
+        const totalRetries = Array.from(retries.values()).reduce(
+          (sum, n) => sum + n,
+          0,
+        );
+        if (totalRetries !== times) {
+          throw new Error(
+            `Expected ${times} retries, but got ${totalRetries}`,
+          );
+        }
+      },
+      expectCircuitOpen(name: string) {
+        const state = circuits.get(name);
+        if (state !== "open") {
+          throw new Error(
+            `Expected circuit '${name}' to be open, but it was ${state ?? "not found"}`,
+          );
+        }
+      },
+      expectCircuitClosed(name: string) {
+        const state = circuits.get(name);
+        if (state !== "closed") {
+          throw new Error(
+            `Expected circuit '${name}' to be closed, but it was ${state ?? "not found"}`,
+          );
+        }
+      },
+      expectTimedOut() {
+        if (timeouts.length === 0) {
+          throw new Error("Expected timeout to occur, but none did");
+        }
+      },
+      expectIdempotencyHit(key: string) {
+        if (!idempotencyHits.has(key)) {
+          throw new Error(
+            `Expected idempotency hit for key '${key}', but none occurred`,
+          );
+        }
+      },
+    } as PolicyAssertion,
+    retries,
+    circuits,
+    timeouts,
+    idempotencyHits,
+  };
+}
+
+export function snapshotPort<T extends object>(port: T): {
+  port: T;
+  interactions: Array<{ method: string; args: unknown[]; result?: unknown; error?: unknown }>;
+} {
+  const interactions: Array<{
+    method: string;
+    args: unknown[];
+    result?: unknown;
+    error?: unknown;
+  }> = [];
+
+  const wrapped: any = {};
+
+  for (const [key, value] of Object.entries(port)) {
+    if (typeof value !== "function") {
+      wrapped[key] = value;
+      continue;
+    }
+
+    wrapped[key] = async function (...args: unknown[]) {
+      const interaction: {
+        method: string;
+        args: unknown[];
+        result?: unknown;
+        error?: unknown;
+      } = {
+        method: key,
+        args,
+      };
+
+      try {
+        const result = await (value as Function).apply(port, args);
+        interaction.result = result;
+        interactions.push(interaction);
+        return result;
+      } catch (error) {
+        interaction.error = error;
+        interactions.push(interaction);
+        throw error;
+      }
+    };
+  }
+
+  return { port: wrapped as T, interactions };
+}

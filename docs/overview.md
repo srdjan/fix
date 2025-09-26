@@ -56,11 +56,40 @@ timeout) and consistent for both ports and resource acquires.
 - **Meta-first** – type inference flows from the declarative `meta`, so
   consumers only access what they declare.
 - **Developer ergonomics** – `defineStep<Base>()` preserves literal inference
-  without verbose generic signatures.
+  without verbose generic signatures. New fluent meta builder and step
+  composition utilities make complex workflows readable.
 - **Host agnostic** – macros depend on host-provided factories (`makeHttp`,
   `makeDb`, …); swap `env` objects to target Node, Deno, workers, or tests.
 - **Testable** – `@macrofx/testing` supplies fakes; the executor accepts any env
   implementing the same factories.
+
+## New Ergonomic Features
+
+### Result Type
+Type-safe error handling without exceptions using `Result<T, E>` with functional
+combinators (`map`, `flatMap`, `matchResult`). Wrap steps with `withResult()` to
+return Results instead of throwing.
+
+### Meta Builder
+Fluent API for building meta objects: `meta().withDb("ro").withKv("ns").build()`.
+Compose meta with `mergeMeta()` and `extendMeta()`.
+
+### Step Composition
+- `pipe()` – sequential pipelines
+- `allSteps()` – parallel execution
+- `race()` – first-to-complete
+- `branch()` – pattern-matched routing with ts-pattern
+- `conditional()` – if/else step selection
+
+### Context Helpers
+Enhanced execution context with `ctx.span()`, `ctx.child()`, and `ctx.memo()` for
+telemetry, nested steps, and request-scoped caching.
+
+### Better Validation
+Helpful error messages with suggestions using Levenshtein distance for typo
+detection.
+
+For details, see [`docs/ergonomic-enhancements.md`](./ergonomic-enhancements.md).
 
 For a tour of the API surface, see [`docs/api.md`](./api.md). Hands-on guides
 live in [`docs/examples.md`](./examples.md) and the new scenario docs referenced
