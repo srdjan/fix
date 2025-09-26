@@ -1,5 +1,5 @@
 import { sleep, withJitter, wrapMethods } from "./utils.ts";
-import type { Meta } from "./types.ts";
+import type { CircuitProvider, CircuitState, Meta } from "./types.ts";
 
 function wrapRetry<T extends object>(
   port: T,
@@ -57,34 +57,47 @@ function wrapTimeout<T extends object>(
     }) as T;
 }
 
+function getCircuitState(
+  label: string,
+  policy: NonNullable<Meta["circuit"]>,
+  provider?: CircuitProvider,
+): CircuitState {
+  return provider?.(policy.name ?? label, policy) ?? { openUntil: 0 };
+}
+
 function wrapCircuit<T extends object>(
   port: T,
   policy: NonNullable<Meta["circuit"]>,
   logger: any,
   family: string,
+  provider?: CircuitProvider,
 ): T {
   const cooldown = policy.halfOpenAfterMs ?? 30_000;
-  let openUntil = 0;
+  const state = getCircuitState(family, policy, provider);
+  const circuitKey = policy.name ?? family;
   return wrapMethods(
     port,
     (fn, key) =>
       async function wrapped(this: any, ...args: any[]) {
         const now = Date.now();
+        const openUntil = state.openUntil ?? 0;
         if (now < openUntil) {
           const remaining = openUntil - now;
           logger?.warn?.(`${family}.${String(key)} circuit-open`, {
             remainingMs: remaining,
+            circuit: circuitKey,
           });
           throw new Error("circuit-open");
         }
         try {
           const out = await fn.apply(this, args);
-          openUntil = 0;
+          state.openUntil = 0;
           return out;
         } catch (e) {
-          openUntil = Date.now() + cooldown;
+          state.openUntil = Date.now() + cooldown;
           logger?.warn?.(`${family}.${String(key)} circuit-trip`, {
             cooldownMs: cooldown,
+            circuit: circuitKey,
             error: String(e),
           });
           throw e;
@@ -116,7 +129,11 @@ function wrapLog<T extends object>(port: T, logger: any, family: string): T {
   ) as T;
 }
 
-export function weave(meta: Meta, caps: any): any {
+export function weave(
+  meta: Meta,
+  caps: any,
+  opts?: { getCircuit?: CircuitProvider },
+): any {
   let out = { ...caps };
   const retry = meta.retry;
   const timeout = meta.timeout;
@@ -126,7 +143,7 @@ export function weave(meta: Meta, caps: any): any {
   const wrapPort = (k: string) => {
     if (!out[k]) return;
     let p = out[k];
-    if (circuit) p = wrapCircuit(p, circuit, log, k);
+    if (circuit) p = wrapCircuit(p, circuit, log, k, opts?.getCircuit);
     if (log) p = wrapLog(p, log, k);
     if (retry) p = wrapRetry(p, retry);
     if (timeout?.ms) p = wrapTimeout(p, timeout);
@@ -156,6 +173,7 @@ export function weave(meta: Meta, caps: any): any {
         circuit,
         log,
         label,
+        opts?.getCircuit,
       );
       baseAcquire = (...args: any[]) => wrapped.acquire(...args);
     }

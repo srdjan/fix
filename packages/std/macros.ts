@@ -1,4 +1,10 @@
-import type { Macro, Meta } from "../core/types.ts";
+import {
+  getMacroResult,
+  hasMacroResult,
+  type Macro,
+  type Meta,
+  setMacroResult,
+} from "../core/types.ts";
 import type {
   Bracket,
   CryptoPort,
@@ -106,15 +112,16 @@ export const idempotencyMacro: Macro<Meta, {}> = {
     const existing = await ctx.kv.get(`idem:${key}`);
     if (existing !== null && existing !== undefined) {
       ctx.log?.info?.("idempotency.hit", { key });
-      ctx.__macrofxSkip = true;
-      ctx.__macrofxValue = existing;
+      setMacroResult(ctx, existing);
     }
   },
   after: async (value: any, ctx: any) => {
     const key: string | undefined = ctx?.meta?.idempotency?.key ??
       ctx?.idempotencyKey;
     if (!key || !ctx.kv) return value;
-    if (ctx.__macrofxSkip) return ctx.__macrofxValue;
+    if (hasMacroResult(ctx)) {
+      return getMacroResult(ctx);
+    }
     await ctx.kv.set(
       `idem:${key}`,
       value,

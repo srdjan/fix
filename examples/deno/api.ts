@@ -2,27 +2,23 @@
 // We simulate an endpoint that fetches a user (db) and caches it (kv),
 // with retry + timeout + logging + tempDir resource.
 
-import { execute, type Meta, type Step } from "../../packages/core/mod.ts";
+import { defineStep, execute, type Meta } from "../../packages/core/mod.ts";
 import { stdMacros } from "../../packages/std/mod.ts";
 import { hostNodeEnv } from "../../packages/host-node/mod.ts";
 
 type Base = { requestId: string; userId: string };
 
-const meta = {
-  db: { role: "ro" },
-  kv: { namespace: "users" },
-  http: { baseUrl: "http://localhost" }, // unused; here just to show type gating
-  fs: { tempDir: true },
-  retry: { times: 2, delayMs: 50 },
-  timeout: { ms: 500, acquireMs: 2000 },
-  log: { level: "debug" },
-} as const satisfies Meta;
-
-type StepMeta = typeof meta;
-
-const step: Step<StepMeta, Base, { id: string; name: string }, symbol> = {
+const step = defineStep<Base>()({
   name: "get-user",
-  meta,
+  meta: {
+    db: { role: "ro" },
+    kv: { namespace: "users" },
+    http: { baseUrl: "http://localhost" }, // unused; here just to show type gating
+    fs: { tempDir: true },
+    retry: { times: 2, delayMs: 50 },
+    timeout: { ms: 500, acquireMs: 2000 },
+    log: { level: "debug" },
+  } satisfies Meta,
   async run({ kv, lease, bracket, userId, log }) {
     const cacheKey = `user:${userId}`;
     const hit = await kv.get<{ id: string; name: string }>(cacheKey);
@@ -44,7 +40,7 @@ const step: Step<StepMeta, Base, { id: string; name: string }, symbol> = {
     await kv.set(cacheKey, row, 60_000);
     return row;
   },
-};
+});
 
 const base: Base = { requestId: crypto.randomUUID(), userId: "123" };
 

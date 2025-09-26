@@ -44,8 +44,26 @@ export type LogPort = {
 
 // Resource leasing
 declare const ScopeBrand: unique symbol;
+const scopeBrandToken = Symbol.for("macrofx.scope");
+const defaultScopeToken = Symbol.for("macrofx.scope-token");
+
 export type Lease<T, Scope> = T & { readonly [ScopeBrand]: Scope };
 export type Releasable<T> = { value: T; release: () => Promise<void> };
+
+export function brandLease<T extends object, Scope>(
+  value: T,
+  token: symbol = defaultScopeToken,
+): Lease<T, Scope> {
+  if (!Object.prototype.hasOwnProperty.call(value, scopeBrandToken)) {
+    Object.defineProperty(value, scopeBrandToken, {
+      value: token as unknown as Scope,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
+  }
+  return value as Lease<T, Scope>;
+}
 
 export type LockHandle = { key: string };
 

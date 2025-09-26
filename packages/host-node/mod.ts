@@ -2,16 +2,20 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp as _mkdtemp, rm as _rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type {
-  DbPort,
-  HttpPort,
-  KvPort,
-  Lease,
-  LeasePort,
-  LogLevel,
-  LogPort,
-  QueuePort,
-  TimePort,
+import {
+  brandLease,
+  type DbPort,
+  type HttpPort,
+  type KvPort,
+  type Lease,
+  type LeasePort,
+  type LockHandle,
+  type LogLevel,
+  type LogPort,
+  type QueuePort,
+  type Releasable,
+  type Socket,
+  type TimePort,
 } from "../ports/mod.ts";
 import { makePool } from "../resources/pool.ts";
 
@@ -83,7 +87,8 @@ export function makeDb(meta: { role: "ro" | "rw" }) {
     const db = await pool.acquire();
     try {
       await db.begin();
-      const out = await fn(db as Lease<DbPort, any>);
+      const leased = brandLease<DbPort, any>(db);
+      const out = await fn(leased);
       await db.commit();
       await pool.release(db);
       return out;
@@ -100,7 +105,7 @@ export function makeDb(meta: { role: "ro" | "rw" }) {
   const leaseDb = async <S>(_role: "ro" | "rw") => {
     const db = await pool.acquire();
     return {
-      value: db as Lease<DbPort, S>,
+      value: brandLease<DbPort, S>(db),
       release: async () => {
         await pool.release(db);
       },
@@ -170,6 +175,22 @@ export const fs = {
   },
 };
 
+type CircuitState = { openUntil?: number };
+const circuitStates = new Map<string, CircuitState>();
+
+export function makeCircuit(
+  name: string,
+  _policy?: { halfOpenAfterMs?: number },
+): CircuitState {
+  const key = name || "default";
+  let state = circuitStates.get(key);
+  if (!state) {
+    state = { openUntil: 0 };
+    circuitStates.set(key, state);
+  }
+  return state;
+}
+
 // Export env bundle for std macros
 export const hostNodeEnv = {
   makeHttp,
@@ -180,12 +201,23 @@ export const hostNodeEnv = {
   makeCrypto,
   makeLogger,
   fs,
-  makeLock: () => async (key: string) => ({
-    value: { key },
+  makeCircuit,
+  makeLock: () =>
+  async (
+    key: string,
+  ): Promise<Releasable<Lease<LockHandle, any>>> => ({
+    value: brandLease<LockHandle, any>({ key }),
     release: async () => {},
   }),
-  makeSocket: () => async (_host: string, _port: number) => ({
-    value: { write: async () => {}, close: async () => {} },
+  makeSocket: () =>
+  async (
+    _host: string,
+    _port: number,
+  ): Promise<Releasable<Lease<Socket, any>>> => ({
+    value: brandLease<Socket, any>({
+      write: async () => {},
+      close: async () => {},
+    }),
     release: async () => {},
   }),
 };

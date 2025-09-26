@@ -2,7 +2,9 @@
 
 All examples are TypeScript modules that can be executed with Deno 2+
 (`deno run -A …`). They adhere to the light functional style: no decorators, no
-classes – just data and functions.
+classes – just data and functions. Each step is declared via
+`defineStep<Base>()` so `meta` literals stay inferred without manual type
+plumbing.
 
 ## Quick Start
 

@@ -10,6 +10,32 @@ import type {
   TimePort,
 } from "../ports/mod.ts";
 
+const MACROFX_SKIP_SYMBOL = Symbol.for("macrofx.skip");
+const MACROFX_VALUE_SYMBOL = Symbol.for("macrofx.value");
+
+export const MACROFX_SKIP = MACROFX_SKIP_SYMBOL;
+export const MACROFX_VALUE = MACROFX_VALUE_SYMBOL;
+
+export type MacroResultCarrier = {
+  [MACROFX_SKIP_SYMBOL]?: true;
+  [MACROFX_VALUE_SYMBOL]?: unknown;
+};
+
+export function setMacroResult<T>(ctx: MacroResultCarrier, value: T): void {
+  ctx[MACROFX_SKIP_SYMBOL] = true;
+  ctx[MACROFX_VALUE_SYMBOL] = value;
+}
+
+export function hasMacroResult(
+  ctx: MacroResultCarrier,
+): ctx is MacroResultCarrier & { [MACROFX_SKIP_SYMBOL]: true } {
+  return Boolean(ctx[MACROFX_SKIP_SYMBOL]);
+}
+
+export function getMacroResult<T>(ctx: MacroResultCarrier): T | undefined {
+  return ctx[MACROFX_VALUE_SYMBOL] as T | undefined;
+}
+
 export type Meta = {
   // effect capabilities
   http?: { baseUrl?: string; auth?: "bearer" | "none" };
@@ -54,7 +80,8 @@ export type CapsOf<M extends Meta, Scope> =
 export type ExecutionCtx<M extends Meta, Base, Scope> =
   & Base
   & CapsOf<M, Scope>
-  & { meta: M };
+  & { meta: M }
+  & MacroResultCarrier;
 
 export type Step<M extends Meta, Base, Out, Scope> = {
   name: string;
@@ -79,4 +106,23 @@ export type EngineConfig<Base, M extends Meta> = {
   env?: unknown;
 };
 
-export type Weaver = (meta: Meta, caps: any) => any;
+export type WeaveOptions = { getCircuit?: CircuitProvider };
+export type Weaver = (meta: Meta, caps: any, opts?: WeaveOptions) => any;
+
+export type CircuitState = { openUntil?: number };
+export type CircuitProvider = (
+  name: string,
+  policy: NonNullable<Meta["circuit"]>,
+) => CircuitState;
+
+export function defineStep<Base, Scope = symbol>() {
+  return function <const M extends Meta, Out>(
+    step: {
+      name: string;
+      meta: M;
+      run: (ctx: ExecutionCtx<M, Base, Scope>) => Promise<Out> | Out;
+    },
+  ): Step<M, Base, Out, Scope> {
+    return step;
+  };
+}

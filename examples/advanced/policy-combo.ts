@@ -1,4 +1,4 @@
-import { execute, type Meta, type Step } from "../../packages/core/mod.ts";
+import { defineStep, execute, type Meta } from "../../packages/core/mod.ts";
 import { stdMacros } from "../../packages/std/mod.ts";
 import { hostNodeEnv } from "../../packages/host-node/mod.ts";
 
@@ -48,21 +48,17 @@ const policyEnv = {
   makeKv: () => sharedKv,
 };
 
-const meta = {
-  http: { baseUrl: "https://api.demo" },
-  kv: { namespace: "policy-demo" },
-  log: { level: "debug" },
-  retry: { times: 2, delayMs: 20, jitter: false },
-  timeout: { ms: 500 },
-  idempotency: { key: "policy-demo" },
-  circuit: { name: "primary-http", halfOpenAfterMs: 5_000 },
-} as const satisfies Meta;
-
-type StepMeta = typeof meta;
-
-const step: Step<StepMeta, Base, PolicyResult, symbol> = {
+const step = defineStep<Base, symbol>()({
   name: "policy-combo",
-  meta,
+  meta: {
+    http: { baseUrl: "https://api.demo" },
+    kv: { namespace: "policy-demo" },
+    log: { level: "debug" },
+    retry: { times: 2, delayMs: 20, jitter: false },
+    timeout: { ms: 500 },
+    idempotency: { key: "policy-demo" },
+    circuit: { name: "primary-http", halfOpenAfterMs: 5_000 },
+  } satisfies Meta,
   async run({ http, kv, log, meta }) {
     const idemKey = meta.idempotency?.key || "policy-demo";
     const cacheKey = `user:${idemKey}`;
@@ -98,7 +94,7 @@ const step: Step<StepMeta, Base, PolicyResult, symbol> = {
 
     return { source: "primary", user, circuitOpened };
   },
-};
+});
 
 const base: Base = {
   requestId: crypto.randomUUID(),

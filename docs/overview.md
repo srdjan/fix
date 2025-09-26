@@ -55,6 +55,8 @@ timeout) and consistent for both ports and resource acquires.
   hierarchies.
 - **Meta-first** – type inference flows from the declarative `meta`, so
   consumers only access what they declare.
+- **Developer ergonomics** – `defineStep<Base>()` preserves literal inference
+  without verbose generic signatures.
 - **Host agnostic** – macros depend on host-provided factories (`makeHttp`,
   `makeDb`, …); swap `env` objects to target Node, Deno, workers, or tests.
 - **Testable** – `@macrofx/testing` supplies fakes; the executor accepts any env

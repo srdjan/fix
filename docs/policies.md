@@ -29,6 +29,9 @@ meta: {
   present.
 - Works for both ports and leases; you can protect `lease.lock` acquires from
   stampedes.
+- Provide an `env.makeCircuit(name, policy)` function to persist breaker state
+  across executions (the Node host does this by default). Without it, circuits
+  reset on every `execute` call.
 
 ## Retry
 
@@ -81,8 +84,9 @@ meta: {
 - **Resource hygiene**: place nested `lease.*` operations inside `bracket` even
   when also using timeouts to guarantee release.
 - **Macro-driven recovery**: custom macros can populate
-  `ctx.__macrofxSkip`/`ctx.__macrofxValue` to short-circuit on known failure
-  scenarios (e.g. golden cache, feature flag).
+  `setMacroResult(ctx, value)` to short-circuit on known failure scenarios (e.g.
+  golden cache, feature flag) without leaking implementation details through the
+  context object.
 
 Refer to
 [`examples/advanced/policy-combo.ts`](./../examples/advanced/policy-combo.ts)

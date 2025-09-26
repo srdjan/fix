@@ -1,6 +1,13 @@
 import { weave } from "./weave.ts";
 import { bracket } from "./bracket.ts";
-import type { EngineConfig, Meta, Step } from "./types.ts";
+import {
+  type CircuitProvider,
+  type EngineConfig,
+  getMacroResult,
+  hasMacroResult,
+  type Meta,
+  type Step,
+} from "./types.ts";
 
 export async function execute<M extends Meta, Base, Out, Scope>(
   step: Step<M, Base, Out, Scope>,
@@ -24,7 +31,17 @@ export async function execute<M extends Meta, Base, Out, Scope>(
   }
 
   // 3) weave policies (retry/timeout/log etc)
-  const ctx: any = { ...base, ...weave(step.meta as any, caps) };
+  const makeCircuit = typeof (env as any)?.makeCircuit === "function"
+    ? (env as any).makeCircuit as CircuitProvider
+    : undefined;
+  const ctx: any = {
+    ...base,
+    ...weave(step.meta as any, caps, {
+      getCircuit: makeCircuit
+        ? (name, policy) => makeCircuit(name, policy)
+        : undefined,
+    }),
+  };
   ctx.meta = step.meta;
 
   // 4) before guards
@@ -34,8 +51,8 @@ export async function execute<M extends Meta, Base, Out, Scope>(
     }
   }
 
-  if ((ctx as any).__macrofxSkip) {
-    return (ctx as any).__macrofxValue as Out;
+  if (hasMacroResult(ctx)) {
+    return getMacroResult<Out>(ctx)!;
   }
 
   // 5) run
@@ -48,6 +65,9 @@ export async function execute<M extends Meta, Base, Out, Scope>(
         result = await m.after(result, ctx);
       }
     }
+    if (hasMacroResult(ctx)) {
+      return getMacroResult<Out>(ctx)!;
+    }
     return result;
   } catch (e) {
     // onError hooks (first one that throws wins)
@@ -56,6 +76,9 @@ export async function execute<M extends Meta, Base, Out, Scope>(
         const maybe = await m.onError(e, ctx);
         if (maybe !== undefined) return maybe as Out;
       }
+    }
+    if (hasMacroResult(ctx)) {
+      return getMacroResult<Out>(ctx)!;
     }
     throw e;
   }

@@ -75,6 +75,14 @@ macrofx-unified/
 - `examples/testing/with-fakes.test.ts` — demonstrates using `@macrofx/testing`
   fakes inside Deno tests.
 
+## Testing helpers
+
+- `fakeLogger()` captures structured logs for assertions.
+- `fakeKv()` / `fakeHttp()` / `fakeTime()` provide deterministic, stateful
+  ports.
+- `withChaos()` wraps any port with configurable failure or latency injection
+  for resilience testing.
+
 ## Publishing strategy
 
 - Keep code here as a mono-source of truth.

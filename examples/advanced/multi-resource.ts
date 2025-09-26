@@ -1,4 +1,4 @@
-import { execute, type Meta, type Step } from "../../packages/core/mod.ts";
+import { defineStep, execute, type Meta } from "../../packages/core/mod.ts";
 import { stdMacros } from "../../packages/std/mod.ts";
 import { hostNodeEnv } from "../../packages/host-node/mod.ts";
 
@@ -14,21 +14,17 @@ type MultiResourceOut = {
   artifacts: string[];
 };
 
-const meta = {
-  db: { role: "rw" },
-  kv: { namespace: "users" },
-  fs: { tempDir: true },
-  lock: { mode: "exclusive" },
-  retry: { times: 2, delayMs: 25 },
-  timeout: { ms: 750, acquireMs: 500 },
-  log: { level: "info" },
-} as const satisfies Meta;
-
-type StepMeta = typeof meta;
-
-const step: Step<StepMeta, Base, MultiResourceOut, symbol> = {
+const step = defineStep<Base, symbol>()({
   name: "multi-resource-sync",
-  meta,
+  meta: {
+    db: { role: "rw" },
+    kv: { namespace: "users" },
+    fs: { tempDir: true },
+    lock: { mode: "exclusive" },
+    retry: { times: 2, delayMs: 25 },
+    timeout: { ms: 750, acquireMs: 500 },
+    log: { level: "info" },
+  } satisfies Meta,
   async run({ bracket, lease, kv, log, tenantId }) {
     const cacheKey = `user:${tenantId}`;
     const cached = await kv.get<{ id: string; name: string }>(cacheKey);
@@ -75,7 +71,7 @@ const step: Step<StepMeta, Base, MultiResourceOut, symbol> = {
       },
     );
   },
-};
+});
 
 const base: Base = { tenantId: "123" };
 

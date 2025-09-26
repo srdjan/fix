@@ -7,30 +7,19 @@ keep tests deterministic.
 ## Logger capture
 
 ```ts
-import { execute, type Meta, type Step } from "@macrofx/core";
+import { defineStep, execute } from "@macrofx/core";
 import { stdMacros } from "@macrofx/std";
-import { fakeLogger } from "@macrofx/testing";
+import { fakeKv, fakeLogger } from "@macrofx/testing";
 
 const { logs, logger } = fakeLogger();
-
-const store = new Map<string, unknown>();
+const { port: kv } = fakeKv();
 
 const testEnv = {
-  makeKv: () => ({
-    async get<T>(key: string) {
-      return (store.get(key) ?? null) as T | null;
-    },
-    async set<T>(key: string, value: T) {
-      store.set(key, value);
-    },
-    async del(key: string) {
-      store.delete(key);
-    },
-  }),
+  makeKv: () => kv,
   makeLogger: () => logger,
 };
 
-const step: Step<Meta, { tenantId: string }, string, symbol> = {
+const cacheStep = defineStep<{ tenantId: string }>()({
   name: "cache",
   meta: { kv: { namespace: "tests" }, log: { level: "debug" } },
   async run({ kv, log, tenantId }) {
@@ -45,9 +34,9 @@ const step: Step<Meta, { tenantId: string }, string, symbol> = {
     await kv.set(key, value);
     return value;
   },
-};
+});
 
-await execute(step, {
+await execute(cacheStep, {
   base: { tenantId: "green" },
   macros: stdMacros as any,
   env: testEnv,
@@ -56,15 +45,19 @@ await execute(step, {
 
 - `fakeLogger()` captures every log call in the `logs` array for straightforward
   assertions.
+- `fakeKv()` returns a deterministic in-memory KV along with the underlying
+  store for white-box checks.
 - Supply only the host factories needed for the macros you enable. With the meta
   above, only `makeKv` and `makeLogger` are required.
 
 ## Deterministic capability fakes
 
-- Wrap plain objects to satisfy port interfaces (`HttpPort`, `KvPort`, …). No
-  inheritance is needed; returning functions is enough.
-- Use closures to control failure modes (e.g. count how many times a method
-  runs, throw after N invocations, inject latency).
+- Use `fakeHttp()` to stub HTTP ports with per-route handlers and inspect call
+  history; return plain objects to respond with JSON.
+- `fakeTime()` gives you a clock whose `sleep` simply advances internal time —
+  perfect for timeout and retry tests.
+- Wrap any port with `withChaos(port, { failRate })` to simulate transient
+  failures or latency spikes without touching production code.
 - Keep stores (`Map`, arrays) at the env level so data persists across multiple
   `execute` calls in your test.
 
@@ -74,8 +67,9 @@ await execute(step, {
   but semantic checks remain stable.
 - Inspect resource usage by swapping `lease.*` implementations with fakes that
   record `acquire`/`release` pairs.
-- Avoid relying on private sentinel fields (`__macrofxSkip`) in tests; assert on
-  externally observable behaviour (outputs, logged messages, store contents).
+- Avoid relying on private sentinel fields — prefer the exported helpers (e.g.
+  `setMacroResult`) or assert on externally observable behaviour (outputs,
+  logged messages, store contents).
 
 See
 [`examples/testing/with-fakes.test.ts`](./../examples/testing/with-fakes.test.ts)

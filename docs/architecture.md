@@ -32,5 +32,7 @@ Executor implementation highlights:
   request `db`, `fs.tempDir`, and `lock` simultaneously.
 - `ctx.meta` is injected for macro coordination and diagnostics but remains
   read-only by convention.
-- Macros can short-circuit by setting `ctx.__macrofxSkip`/`ctx.__macrofxValue`
-  in `before`; the executor respects this before invoking `run`.
+- Macros can short-circuit via `setMacroResult(ctx, value)` during `before`, and
+  the executor respects this before invoking `run`.
+- Provide `env.makeCircuit(name, policy)` to persist circuit breaker state
+  across executions; otherwise an in-memory per-run breaker is used.
