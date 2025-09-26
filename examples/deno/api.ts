@@ -2,7 +2,7 @@
 // with retry + timeout + logging + tempDir resource.
 
 import { defineStep, type Meta } from "../../packages/core/mod.ts";
-import { createStdEngine } from "../../packages/std/mod.ts";
+import { createStdEngine } from "../../packages/std/engine.ts";
 
 type Base = { requestId: string; userId: string };
 
@@ -30,6 +30,7 @@ const step = defineStep<Base>()({
       () => lease.tempDir("example-"),
       async ({ path }: { path: string }) => {
         log.debug("temp.path", { path });
+        await Promise.resolve();
       },
     );
 
@@ -42,7 +43,7 @@ const step = defineStep<Base>()({
 
 const base: Base = { requestId: crypto.randomUUID(), userId: "123" };
 
-const engine = createStdEngine<Base>();
+const engine = createStdEngine<Base>({} as any);
 const out = await engine.run(step, base);
 
 console.log("GET /users/123 →", out);
