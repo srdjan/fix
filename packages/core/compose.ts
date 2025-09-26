@@ -1,15 +1,9 @@
-import type {
-  CapsOf,
-  EngineConfig,
-  ExecutionCtx,
-  Meta,
-  Step,
-} from "./types.ts";
+import type { ExecutionCtx, Meta, Step } from "./types.ts";
 import { mergeMeta } from "./meta-builder.ts";
 import type { Result } from "./result.ts";
 import { err, ok } from "./result.ts";
 import { getEngineFromContext } from "./context-helpers.ts";
-import { match, P } from "ts-pattern";
+import { match } from "ts-pattern";
 
 type MergeMeta<M1 extends Meta, M2 extends Meta> = M1 & M2;
 

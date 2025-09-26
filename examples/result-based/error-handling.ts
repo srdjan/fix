@@ -1,4 +1,4 @@
-import { defineStep, createEngine } from "../../packages/core/mod.ts";
+import { createEngine, defineStep } from "../../packages/core/mod.ts";
 import { withResult } from "../../packages/core/compose.ts";
 import {
   isOk,

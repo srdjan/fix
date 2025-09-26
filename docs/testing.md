@@ -75,3 +75,20 @@ await engine.run(cacheStep, { tenantId: "green" });
 See
 [`examples/testing/with-fakes.test.ts`](./../examples/testing/with-fakes.test.ts)
 for a runnable, self-contained reference.
+
+## Core Framework Tests
+
+The framework includes comprehensive unit tests for core functionality:
+
+- [`packages/core/result.test.ts`](./../packages/core/result.test.ts) - Tests
+  for Result type utilities (ok, err, map, flatMap, mapErr, all)
+- [`packages/core/meta-builder.test.ts`](./../packages/core/meta-builder.test.ts) -
+  Tests for meta builder functionality and capability chaining
+- [`packages/core/weave.test.ts`](./../packages/core/weave.test.ts) - Tests for
+  policy weaving and resource management
+
+Run all tests with:
+
+```bash
+deno test -A
+```

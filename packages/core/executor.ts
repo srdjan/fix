@@ -85,7 +85,7 @@ async function runStep<M extends Meta, Base, Out, Scope>(
 
   const matched = macros.filter((macro) => macro.match(step.meta as any));
 
-  let caps: any = { bracket };
+  const caps: any = { bracket };
   const resolved = await Promise.all(
     matched.map(async (macro) => await macro.resolve(step.meta as any, env)),
   );

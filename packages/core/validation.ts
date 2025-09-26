@@ -38,7 +38,8 @@ export const validateStep = <M extends Meta, Base, Out, Scope>(
     errors.push({
       code: "MISSING_META",
       message: "Step must have a meta property",
-      suggestion: "Use the meta builder: meta().withDb('ro').withKv('ns').build()",
+      suggestion:
+        "Use the meta builder: meta().withDb('ro').withKv('ns').build()",
     });
     return { valid: false, errors };
   }
@@ -55,7 +56,10 @@ export const validateStep = <M extends Meta, Base, Out, Scope>(
   const availableMacroKeys = new Set(macros.map((m) => m.key));
 
   for (const cap of declaredCapabilities) {
-    if (cap === "retry" || cap === "timeout" || cap === "circuit" || cap === "idempotency") {
+    if (
+      cap === "retry" || cap === "timeout" || cap === "circuit" ||
+      cap === "idempotency"
+    ) {
       continue;
     }
 
@@ -63,11 +67,15 @@ export const validateStep = <M extends Meta, Base, Out, Scope>(
       const similar = findSimilar(cap, Array.from(availableMacroKeys));
       errors.push({
         code: "UNKNOWN_CAPABILITY",
-        message: `Step declares capability '${cap}' but no matching macro is registered`,
+        message:
+          `Step declares capability '${cap}' but no matching macro is registered`,
         suggestion: similar
           ? `Did you mean '${similar}'? Add the corresponding macro to your macros array`
           : `Register a macro with key '${cap}' or remove it from meta`,
-        details: { capability: cap, availableMacros: Array.from(availableMacroKeys) },
+        details: {
+          capability: cap,
+          availableMacros: Array.from(availableMacroKeys),
+        },
       });
     }
   }
@@ -88,7 +96,10 @@ export const validateMeta = (
   const availableMacroKeys = new Set(macros.map((m) => m.key));
 
   for (const cap of declaredCapabilities) {
-    if (cap === "retry" || cap === "timeout" || cap === "circuit" || cap === "idempotency") {
+    if (
+      cap === "retry" || cap === "timeout" || cap === "circuit" ||
+      cap === "idempotency"
+    ) {
       continue;
     }
 
@@ -96,7 +107,8 @@ export const validateMeta = (
       const similar = findSimilar(cap, Array.from(availableMacroKeys));
       errors.push({
         code: "UNKNOWN_CAPABILITY",
-        message: `Meta declares capability '${cap}' but no matching macro is registered`,
+        message:
+          `Meta declares capability '${cap}' but no matching macro is registered`,
         suggestion: similar
           ? `Did you mean '${similar}'?`
           : `Register a macro with key '${cap}'`,
@@ -138,7 +150,9 @@ export const validateMeta = (
   return { valid: true };
 };
 
-export const formatValidationErrors = (errors: readonly ValidationError[]): string => {
+export const formatValidationErrors = (
+  errors: readonly ValidationError[],
+): string => {
   return errors
     .map((e, i) => {
       let msg = `${i + 1}. [${e.code}] ${e.message}`;
@@ -175,7 +189,10 @@ export const assertValidMeta = (
   }
 };
 
-const findSimilar = (input: string, candidates: string[]): string | undefined => {
+const findSimilar = (
+  input: string,
+  candidates: string[],
+): string | undefined => {
   const threshold = 3;
   let bestMatch: string | undefined;
   let bestDistance = Infinity;

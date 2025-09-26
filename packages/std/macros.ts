@@ -1,4 +1,5 @@
 import {
+  type ExecutionCtx,
   getMacroResult,
   hasMacroResult,
   type Macro,
@@ -6,7 +7,6 @@ import {
   setMacroResult,
 } from "../core/types.ts";
 import type {
-  Bracket,
   CryptoPort,
   DbPort,
   HttpPort,
@@ -16,96 +16,111 @@ import type {
   QueuePort,
   TimePort,
 } from "../ports/mod.ts";
+import type { StdEnv } from "./env.ts";
 import { tempDirOp } from "../resources/fs.ts";
 
 // Built-in capability macros use env to produce ports/openers.
 // env shape is host-defined. We expect functions like makeHttp(), makeKv(), etc.
 
-export const httpMacro: Macro<Meta, { http: HttpPort }> = {
+export const httpMacro: Macro<Meta, { http: HttpPort }, StdEnv> = {
   key: "http",
   match: (m) => !!m.http,
-  resolve: async (m, env: any) => {
+  resolve: (m, env: StdEnv) => {
     const baseUrl = m.http?.baseUrl ?? "";
-    return { http: env.makeHttp(baseUrl, m.http) };
+    return Promise.resolve({ http: env.makeHttp(baseUrl, m.http) });
   },
 };
 
-export const kvMacro: Macro<Meta, { kv: KvPort }> = {
+export const kvMacro: Macro<Meta, { kv: KvPort }, StdEnv> = {
   key: "kv",
   match: (m) => !!m.kv,
-  resolve: async (m, env: any) => ({ kv: env.makeKv(m.kv!.namespace) }),
+  resolve: (m, env: StdEnv) =>
+    Promise.resolve({ kv: env.makeKv(m.kv!.namespace) }),
 };
 
 export const dbMacro: Macro<
   Meta,
-  { db: DbPort } & { lease: Pick<LeasePort<any>, "db" | "tx"> }
+  { db: DbPort } & { lease: Pick<LeasePort<any>, "db" | "tx"> },
+  StdEnv
 > = {
   key: "db",
   match: (m) => !!m.db,
-  resolve: async (m, env: any) => env.makeDb(m.db!),
+  resolve: (m, env: StdEnv) => Promise.resolve(env.makeDb(m.db!)),
 };
 
-export const queueMacro: Macro<Meta, { queue: QueuePort }> = {
+export const queueMacro: Macro<Meta, { queue: QueuePort }, StdEnv> = {
   key: "queue",
   match: (m) => !!m.queue,
-  resolve: async (m, env: any) => ({ queue: env.makeQueue(m.queue!.name) }),
+  resolve: (m, env: StdEnv) =>
+    Promise.resolve({ queue: env.makeQueue(m.queue!.name) }),
 };
 
-export const timeMacro: Macro<Meta, { time: TimePort }> = {
+export const timeMacro: Macro<Meta, { time: TimePort }, StdEnv> = {
   key: "time",
   match: (m) => !!m.time,
-  resolve: async (_m, env: any) => ({ time: env.makeTime() }),
+  resolve: (_m, env: StdEnv) => Promise.resolve({ time: env.makeTime() }),
 };
 
-export const cryptoMacro: Macro<Meta, { crypto: CryptoPort }> = {
+export const cryptoMacro: Macro<Meta, { crypto: CryptoPort }, StdEnv> = {
   key: "crypto",
   match: (m) => !!m.crypto,
-  resolve: async (_m, env: any) => ({ crypto: env.makeCrypto() }),
+  resolve: (_m, env: StdEnv) => Promise.resolve({ crypto: env.makeCrypto() }),
 };
 
-export const logMacro: Macro<Meta, { log: LogPort }> = {
+export const logMacro: Macro<Meta, { log: LogPort }, StdEnv> = {
   key: "log",
   match: (m) => !!m.log,
-  resolve: async (m, env: any) => ({ log: env.makeLogger(m.log!.level) }),
+  resolve: (m, env: StdEnv) =>
+    Promise.resolve({ log: env.makeLogger(m.log!.level) }),
 };
 
 // Resource macros
 
-export const fsMacro: Macro<Meta, { lease: Pick<LeasePort<any>, "tempDir"> }> =
-  {
-    key: "fs",
-    match: (m) => !!m.fs?.tempDir,
-    resolve: async (m, env: any) => {
-      const acquire = tempDirOp(env.fs);
-      return { lease: { tempDir: acquire } as any };
-    },
-  };
+export const fsMacro: Macro<
+  Meta,
+  { lease: Pick<LeasePort<any>, "tempDir"> },
+  StdEnv
+> = {
+  key: "fs",
+  match: (m) => !!m.fs?.tempDir,
+  resolve: (_m, env: StdEnv) => {
+    const acquire = tempDirOp(env.fs);
+    return Promise.resolve({ lease: { tempDir: acquire } as any });
+  },
+};
 
-export const lockMacro: Macro<Meta, { lease: Pick<LeasePort<any>, "lock"> }> = {
+export const lockMacro: Macro<
+  Meta,
+  { lease: Pick<LeasePort<any>, "lock"> },
+  StdEnv
+> = {
   key: "lock",
   match: (m) => !!m.lock,
-  resolve: async (_m, env: any) => ({ lease: { lock: env.makeLock() } as any }),
+  resolve: (_m, env: StdEnv) =>
+    Promise.resolve({ lease: { lock: env.makeLock() } as any }),
 };
 
 export const socketMacro: Macro<
   Meta,
-  { lease: Pick<LeasePort<any>, "socket"> }
+  { lease: Pick<LeasePort<any>, "socket"> },
+  StdEnv
 > = {
   key: "socket",
   match: (m) => !!m.socket,
-  resolve: async (_m, env: any) => ({
-    lease: { socket: env.makeSocket() } as any,
-  }),
+  resolve: (_m, env: StdEnv) =>
+    Promise.resolve({
+      lease: { socket: env.makeSocket() } as any,
+    }),
 };
 
 // Policies that need before/after/onError can be added here (e.g., idempotency).
 // Minimal placeholder for idempotency policy hooking into kv if present.
 
-export const idempotencyMacro: Macro<Meta, {}> = {
+export const idempotencyMacro: Macro<Meta, Record<string, never>> = {
   key: "idempotency",
   match: (m) => !!m.idempotency,
-  resolve: async () => ({}),
-  before: async (ctx: any) => {
+  resolve: () => Promise.resolve({}),
+  before: async (ctx: ExecutionCtx<any, any, any>) => {
     const key: string | undefined = ctx?.meta?.idempotency?.key ??
       ctx?.idempotencyKey;
     if (!key || !ctx.kv) return;
@@ -115,7 +130,7 @@ export const idempotencyMacro: Macro<Meta, {}> = {
       setMacroResult(ctx, existing);
     }
   },
-  after: async (value: any, ctx: any) => {
+  after: async (value: any, ctx: ExecutionCtx<any, any, any>) => {
     const key: string | undefined = ctx?.meta?.idempotency?.key ??
       ctx?.idempotencyKey;
     if (!key || !ctx.kv) return value;

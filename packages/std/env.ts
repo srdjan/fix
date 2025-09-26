@@ -2,7 +2,6 @@ import {
   brandLease,
   type DbPort,
   type Lease,
-  type LeasePort,
   type LockHandle,
   type LogLevel,
   type LogPort,
@@ -45,23 +44,25 @@ export const stdEnv = {
     const store = new Map<string, { value: unknown; exp?: number }>();
     const keyFor = (key: string) => `${namespace}:${key}`;
     return {
-      async get<T>(key: string) {
+      get<T>(key: string) {
         const record = store.get(keyFor(key));
-        if (!record) return null;
+        if (!record) return Promise.resolve(null);
         if (record.exp && record.exp < Date.now()) {
           store.delete(keyFor(key));
-          return null;
+          return Promise.resolve(null);
         }
-        return record.value as T;
+        return Promise.resolve(record.value as T);
       },
-      async set<T>(key: string, value: T, ttlMs?: number) {
+      set<T>(key: string, value: T, ttlMs?: number) {
         store.set(keyFor(key), {
           value,
           exp: ttlMs ? Date.now() + ttlMs : undefined,
         });
+        return Promise.resolve();
       },
-      async del(key: string) {
+      del(key: string) {
         store.delete(keyFor(key));
+        return Promise.resolve();
       },
     };
   },
@@ -72,19 +73,19 @@ export const stdEnv = {
     };
 
     const db: DbPort = {
-      async query<T>(sql: string, _params?: unknown[]) {
-        return (rows[sql] || []) as T[];
+      query<T>(sql: string, _params?: unknown[]) {
+        return Promise.resolve((rows[sql] || []) as T[]);
       },
       async begin() {},
       async commit() {},
       async rollback() {},
     };
 
-    const leaseDb = async <Scope>(_role: "ro" | "rw") => {
-      return {
+    const leaseDb = <Scope>(_role: "ro" | "rw") => {
+      return Promise.resolve({
         value: brandLease<DbPort, Scope>(db),
         release: async () => {},
-      } as Releasable<Lease<DbPort, Scope>>;
+      } as Releasable<Lease<DbPort, Scope>>);
     };
 
     const tx = async <Scope, T>(
@@ -102,8 +103,9 @@ export const stdEnv = {
 
   makeQueue(name: string): QueuePort {
     return {
-      async enqueue(msg) {
+      enqueue(msg) {
         console.log(`[queue:${name}]`, msg);
+        return Promise.resolve();
       },
     };
   },
@@ -148,8 +150,8 @@ export const stdEnv = {
   },
 
   fs: {
-    async mkdtemp(prefix = "tmp-") {
-      return `${prefix}${crypto.randomUUID()}`;
+    mkdtemp(prefix = "tmp-") {
+      return Promise.resolve(`${prefix}${crypto.randomUUID()}`);
     },
     async rm(_path: string, _opts?: { recursive?: boolean }) {
       // no-op for in-memory temp dirs
@@ -167,24 +169,26 @@ export const stdEnv = {
   },
 
   makeLock: () =>
-  async <Scope>(
+  <Scope>(
     key: string,
-  ): Promise<Releasable<Lease<LockHandle, Scope>>> => ({
-    value: brandLease<LockHandle, Scope>({ key }),
-    release: async () => {},
-  }),
+  ): Promise<Releasable<Lease<LockHandle, Scope>>> =>
+    Promise.resolve({
+      value: brandLease<LockHandle, Scope>({ key }),
+      release: async () => {},
+    }),
 
   makeSocket: () =>
-  async <Scope>(
+  <Scope>(
     _host: string,
     _port: number,
-  ): Promise<Releasable<Lease<Socket, Scope>>> => ({
-    value: brandLease<Socket, Scope>({
-      write: async () => {},
-      close: async () => {},
+  ): Promise<Releasable<Lease<Socket, Scope>>> =>
+    Promise.resolve({
+      value: brandLease<Socket, Scope>({
+        write: async () => {},
+        close: async () => {},
+      }),
+      release: async () => {},
     }),
-    release: async () => {},
-  }),
 };
 
 export type StdEnv = typeof stdEnv;

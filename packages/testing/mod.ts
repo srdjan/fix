@@ -58,23 +58,25 @@ export function fakeKv(initial: Record<string, unknown> = {}) {
   }
 
   const port: KvPort = {
-    async get<T>(key: string) {
+    get<T>(key: string) {
       const record = store.get(key);
-      if (!record) return null;
+      if (!record) return Promise.resolve(null);
       if (record.exp && record.exp < Date.now()) {
         store.delete(key);
-        return null;
+        return Promise.resolve(null);
       }
-      return record.value as T;
+      return Promise.resolve(record.value as T);
     },
-    async set<T>(key: string, value: T, ttlMs?: number) {
+    set<T>(key: string, value: T, ttlMs?: number) {
       store.set(key, {
         value,
         exp: ttlMs ? Date.now() + ttlMs : undefined,
       });
+      return Promise.resolve();
     },
-    async del(key: string) {
+    del(key: string) {
       store.delete(key);
+      return Promise.resolve();
     },
   };
 
@@ -88,7 +90,7 @@ export function fakeHttp(initial: Record<string, HttpHandler> = {}) {
     `${method.toUpperCase()} ${path}`;
 
   const port: HttpPort = {
-    async get(path: string, init?: RequestInit) {
+    async get(path: string, _init?: RequestInit) {
       const method = "GET";
       calls.push({ method, path });
       return await toResponse(
@@ -131,8 +133,9 @@ export function fakeTime(start = Date.now()) {
 
   const port: TimePort = {
     now: () => current,
-    async sleep(ms: number) {
+    sleep(ms: number) {
       current += ms;
+      return Promise.resolve();
     },
   };
 
@@ -178,7 +181,7 @@ export function withChaos<T extends object>(
       if (failRate > 0 && random() < failRate) {
         throw errorFactory(key);
       }
-      return await (value as Function).apply(port, args);
+      return await (value as (...args: any[]) => any).apply(port, args);
     };
   }
 
@@ -228,7 +231,9 @@ export function createPolicyTracker() {
         const state = circuits.get(name);
         if (state !== "open") {
           throw new Error(
-            `Expected circuit '${name}' to be open, but it was ${state ?? "not found"}`,
+            `Expected circuit '${name}' to be open, but it was ${
+              state ?? "not found"
+            }`,
           );
         }
       },
@@ -236,7 +241,9 @@ export function createPolicyTracker() {
         const state = circuits.get(name);
         if (state !== "closed") {
           throw new Error(
-            `Expected circuit '${name}' to be closed, but it was ${state ?? "not found"}`,
+            `Expected circuit '${name}' to be closed, but it was ${
+              state ?? "not found"
+            }`,
           );
         }
       },
@@ -262,7 +269,9 @@ export function createPolicyTracker() {
 
 export function snapshotPort<T extends object>(port: T): {
   port: T;
-  interactions: Array<{ method: string; args: unknown[]; result?: unknown; error?: unknown }>;
+  interactions: Array<
+    { method: string; args: unknown[]; result?: unknown; error?: unknown }
+  >;
 } {
   const interactions: Array<{
     method: string;
@@ -291,7 +300,10 @@ export function snapshotPort<T extends object>(port: T): {
       };
 
       try {
-        const result = await (value as Function).apply(port, args);
+        const result = await (value as (...args: any[]) => any).apply(
+          port,
+          args,
+        );
         interaction.result = result;
         interactions.push(interaction);
         return result;

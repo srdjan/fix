@@ -36,8 +36,9 @@ Deno.test("lease acquire timeout releases late resources", async () => {
       await new Promise((res) => setTimeout(res, 10));
       return {
         value: { path: "temp" },
-        release: async () => {
+        release: () => {
           releaseCount++;
+          return Promise.resolve();
         },
       };
     },
@@ -69,10 +70,11 @@ Deno.test("lease acquire emits structured logs", async () => {
   };
 
   const lease = {
-    tempDir: async () => ({
-      value: { path: "temp" },
-      release: async () => {},
-    }),
+    tempDir: () =>
+      Promise.resolve({
+        value: { path: "temp" },
+        release: async () => {},
+      }),
   };
 
   const meta = {
@@ -109,15 +111,15 @@ Deno.test("lease retry honours jitter", async () => {
   try {
     let attempts = 0;
     const lease = {
-      lock: async () => {
+      lock: () => {
         attempts++;
         if (attempts === 1) {
-          throw new Error("boom");
+          return Promise.reject(new Error("boom"));
         }
-        return {
+        return Promise.resolve({
           value: { key: "k" },
           release: async () => {},
-        };
+        });
       },
     };
 

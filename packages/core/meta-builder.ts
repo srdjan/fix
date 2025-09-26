@@ -12,7 +12,7 @@ type MetaBuilderMethods<M extends Partial<Meta>> = {
     M & { db: { role: "ro" | "rw"; tx?: "required" | "new" | "none" } }
   >;
   withQueue(name: string): MetaBuilder<M & { queue: { name: string } }>;
-  withTime(): MetaBuilder<M & { time: {} }>;
+  withTime(): MetaBuilder<M & { time: Record<string, never> }>;
   withCrypto(opts?: {
     uuid?: true;
     hash?: "sha256" | "none";
@@ -63,6 +63,7 @@ type MetaBuilderMethods<M extends Partial<Meta>> = {
   build(): M & Meta;
 };
 
+// deno-lint-ignore ban-types
 export type MetaBuilder<M extends Partial<Meta> = {}> =
   & MetaBuilderMethods<M>
   & (M & Meta);
@@ -156,6 +157,7 @@ const createMetaBuilder = <M extends Partial<Meta>>(
   return base as MetaBuilder<M>;
 };
 
+// deno-lint-ignore ban-types
 export const meta = (): MetaBuilder<{}> => createMetaBuilder({});
 
 export const mergeMeta = <M1 extends Meta, M2 extends Meta>(

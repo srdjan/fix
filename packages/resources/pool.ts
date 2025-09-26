@@ -16,13 +16,14 @@ export function makePool<T>(factory: Factory<T>, destroy: Destroy<T>, max = 8) {
     return await new Promise<T>((res) => waiters.push(res));
   }
 
-  async function release(t: T) {
+  function release(t: T) {
     if (waiters.length) {
       const w = waiters.shift()!;
       w(t);
     } else {
       free.push(t);
     }
+    return Promise.resolve();
   }
 
   async function drain() {

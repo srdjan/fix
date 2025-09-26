@@ -227,7 +227,7 @@ export function weave(
   caps: any,
   opts?: { getCircuit?: CircuitProvider },
 ): any {
-  let out = { ...caps };
+  const out = { ...caps };
   const retry = meta.retry;
   const timeout = meta.timeout;
   const log = caps.log;
@@ -267,10 +267,13 @@ export function weave(
       return wrapAcquire(fn as any, label, acquirePolicies) as F;
     };
 
+    // Store original tx function to avoid circular reference
+    const originalTx = out.lease.tx;
+
     out.lease = {
       ...out.lease,
       db: wrapLeaseFn(out.lease.db, "lease.db"),
-      tx: out.lease.tx && (async (fn: any) => out.lease.tx(fn)), // tx itself has its own bracket
+      tx: originalTx, // tx itself has its own bracket, so don't wrap it
       tempDir: wrapLeaseFn(out.lease.tempDir, "lease.tempDir"),
       lock: wrapLeaseFn(out.lease.lock, "lease.lock"),
       socket: wrapLeaseFn(out.lease.socket, "lease.socket"),

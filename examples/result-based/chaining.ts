@@ -31,11 +31,14 @@ const createUser = (
   id: string,
   email: string,
 ): Result<User, ValidationError> => {
-  return flatMap(validateId(id), (validId) =>
-    map(validateEmail(email), (validEmail) => ({
-      id: validId,
-      email: validEmail,
-    })));
+  return flatMap(
+    validateId(id),
+    (validId) =>
+      map(validateEmail(email), (validEmail) => ({
+        id: validId,
+        email: validEmail,
+      })),
+  );
 };
 
 const result1 = createUser("user123", "ada@example.com");

@@ -42,7 +42,7 @@ export type Meta = {
   kv?: { namespace: string };
   db?: { role: "ro" | "rw"; tx?: "required" | "new" | "none" };
   queue?: { name: string };
-  time?: {};
+  time?: Record<string, never>;
   crypto?: { uuid?: true; hash?: "sha256" | "none" };
   log?: { level: "debug" | "info" | "warn" | "error" };
 
@@ -60,22 +60,27 @@ export type Meta = {
 
 // Build the capabilities object based on meta presence.
 type EffectCaps<M extends Meta> =
-  & (M["http"] extends object ? { http: HttpPort } : {})
-  & (M["kv"] extends object ? { kv: KvPort } : {})
-  & (M["db"] extends object ? { db?: DbPort } : {})
-  & (M["queue"] extends object ? { queue: QueuePort } : {})
-  & (M["time"] extends object ? { time: TimePort } : {})
-  & (M["crypto"] extends object ? { crypto: CryptoPort } : {})
-  & (M["log"] extends object ? { log: LogPort } : {});
+  & (M["http"] extends object ? { http: HttpPort } : Record<string, never>)
+  & (M["kv"] extends object ? { kv: KvPort } : Record<string, never>)
+  & (M["db"] extends object ? { db?: DbPort } : Record<string, never>)
+  & (M["queue"] extends object ? { queue: QueuePort } : Record<string, never>)
+  & (M["time"] extends object ? { time: TimePort } : Record<string, never>)
+  & (M["crypto"] extends object ? { crypto: CryptoPort }
+    : Record<string, never>)
+  & (M["log"] extends object ? { log: LogPort } : Record<string, never>);
 
 type LeaseCaps<M extends Meta, Scope> =
-  & (M["db"] extends object ? Pick<LeasePort<Scope>, "db" | "tx"> : {})
-  & (M["fs"] extends object ? Pick<LeasePort<Scope>, "tempDir"> : {})
-  & (M["lock"] extends object ? Pick<LeasePort<Scope>, "lock"> : {})
-  & (M["socket"] extends object ? Pick<LeasePort<Scope>, "socket"> : {});
+  & (M["db"] extends object ? Pick<LeasePort<Scope>, "db" | "tx">
+    : Record<string, never>)
+  & (M["fs"] extends object ? Pick<LeasePort<Scope>, "tempDir">
+    : Record<string, never>)
+  & (M["lock"] extends object ? Pick<LeasePort<Scope>, "lock">
+    : Record<string, never>)
+  & (M["socket"] extends object ? Pick<LeasePort<Scope>, "socket">
+    : Record<string, never>);
 
 type MaybeLeaseCaps<M extends Meta, Scope> = keyof LeaseCaps<M, Scope> extends
-  never ? {}
+  never ? Record<string, never>
   : { lease: LeaseCaps<M, Scope> };
 
 export type CapsOf<M extends Meta, Scope> =
@@ -95,10 +100,10 @@ export type Step<M extends Meta, Base, Out, Scope> = {
   run: (ctx: ExecutionCtx<M, Base, Scope>) => Promise<Out> | Out;
 };
 
-export type Macro<M, Caps> = {
+export type Macro<M, Caps, Env = unknown> = {
   key: string;
   match: (m: M) => boolean;
-  resolve: (m: M, env: unknown) => Promise<Caps>;
+  resolve: (m: M, env: Env) => Promise<Caps>;
   before?: (ctx: any) => Promise<void>;
   onError?: (e: unknown, ctx: any) => Promise<never | unknown>;
   after?: <T>(value: T, ctx: any) => Promise<T>;

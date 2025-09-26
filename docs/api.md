@@ -9,7 +9,7 @@ the source to keep signatures accurate.
 import { createEngine, type Meta, type Step } from "@fix/core";
 
 const engine = createEngine<Base>({
-  macros: Macro<M, object>[],
+  macros: Macro<M, object, Env>[],
   env?: unknown,
   validate?: boolean,
 });
@@ -35,7 +35,7 @@ export type Engine<Base, M extends Meta = Meta> = {
     base: Base,
     options?: EngineRunOptions,
   ) => Promise<Out>;
-  config: { macros: Macro<M, object>[]; env?: unknown };
+  config: { macros: Macro<M, object, unknown>[]; env?: unknown };
 };
 ```
 
@@ -69,7 +69,7 @@ async function execute<M extends Meta, Base, Out, Scope>(
 ```ts
 export type EngineConfig<Base, M extends Meta> = {
   base: Base;
-  macros: Macro<M, object>[];
+  macros: Macro<M, object, unknown>[];
   env?: unknown;
   validate?: boolean;
 };
@@ -153,10 +153,10 @@ can coexist in one step.
 ## `Macro`
 
 ```ts
-export type Macro<M, Caps> = {
+export type Macro<M, Caps, Env = unknown> = {
   key: string;
   match: (meta: M) => boolean;
-  resolve: (meta: M, env: unknown) => Promise<Caps>;
+  resolve: (meta: M, env: Env) => Promise<Caps>;
   before?: (ctx: unknown) => Promise<void>;
   onError?: (error: unknown, ctx: unknown) => Promise<unknown>;
   after?: <T>(value: T, ctx: unknown) => Promise<T>;
@@ -165,7 +165,8 @@ export type Macro<M, Caps> = {
 
 - `match` should be pure – it is evaluated multiple times per run.
 - `resolve` is allowed to return partial capability objects; the executor merges
-  them.
+  them. The optional `Env` generic parameter allows for type-safe environment
+  access (defaults to `unknown` for backward compatibility).
 - `before` / `after` / `onError` run only when `match(meta)` is truthy.
 - Use `before` to gate execution (e.g. cache hits, rate limits), `after` to
   persist side effects, and `onError` for focused recovery.
